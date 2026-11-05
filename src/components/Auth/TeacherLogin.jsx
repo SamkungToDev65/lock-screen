@@ -235,7 +235,7 @@ export default function TeacherLogin({
       <Card
         elevation={0}
         sx={{
-          maxWidth: 1100,
+          maxWidth: { xs: 500, md: 1100 },
           width: '100%',
           borderRadius: { xs: 4, md: '28px' },
           overflow: 'hidden',
@@ -247,7 +247,7 @@ export default function TeacherLogin({
         }}
       >
         <Grid container>
-          {/* LEFT SIDE: Midnight Blue Hero Panel */}
+          {/* LEFT SIDE: Midnight Blue Hero Panel (Hidden on mobile) */}
           <Grid
             item
             xs={12}
@@ -255,7 +255,7 @@ export default function TeacherLogin({
             sx={{
               background: 'linear-gradient(180deg, #07153b 0%, #0a2052 50%, #061536 100%)',
               p: { xs: 3.5, sm: 4, md: 5 },
-              display: 'flex',
+              display: { xs: 'none', md: 'flex' },
               flexDirection: 'column',
               justifyContent: 'center',
               color: '#ffffff',

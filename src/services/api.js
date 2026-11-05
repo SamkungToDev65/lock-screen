@@ -9,7 +9,7 @@ const LOCAL_ROOMS_KEY = 'secure_exam_rooms';
 const LOCAL_STUDENTS_KEY = 'secure_exam_students';
 const LOCAL_LOGS_KEY = 'secure_exam_logs';
 
-export const DEFAULT_API_URL = 'https://dashboard.bcnlp.ac.th/api/SammLocker';
+export const DEFAULT_API_URL = 'https://dashboard.bcnlp.ac.th/api/SammLocker/index.php';
 const LEGACY_DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwSASTBGD_mcK796wybE6DOQqkdojhfPf7Yes8BZJGMJrqguPNE-900uacOzHKmpbP6/exec';
 
 export const isGasUrl = (url) => {
@@ -36,8 +36,11 @@ export const normalizeGasUrl = (url) => {
       trimmed = trimmed.replace(/\/+$/, '') + '/exec';
     }
   } else {
-    // For standard PHP/REST endpoints, strip trailing slashes or index.php
-    trimmed = trimmed.replace(/\/+$/, '').replace(/\/index\.php$/i, '');
+    // For standard PHP/REST endpoints, ensure it targets index.php to avoid Apache 301 directory redirects
+    trimmed = trimmed.replace(/\/+$/, '');
+    if (!trimmed.endsWith('.php')) {
+      trimmed = `${trimmed}/index.php`;
+    }
   }
 
   return trimmed;
@@ -45,7 +48,12 @@ export const normalizeGasUrl = (url) => {
 
 export const getGasUrl = () => {
   const stored = localStorage.getItem(GAS_URL_KEY);
-  if (!stored || stored === LEGACY_DEFAULT_GAS_URL) {
+  if (
+    !stored ||
+    stored === LEGACY_DEFAULT_GAS_URL ||
+    stored === 'https://dashboard.bcnlp.ac.th/api/SammLocker' ||
+    stored === 'https://dashboard.bcnlp.ac.th/api/SammLocker/'
+  ) {
     localStorage.setItem(GAS_URL_KEY, DEFAULT_API_URL);
     return DEFAULT_API_URL;
   }

@@ -104,23 +104,9 @@ export default function Navbar({
               <ShieldCheck className="w-5 h-5" />
             </Box>
             <Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#0f172a', lineHeight: 1.2 }}>
-                  SAMMLocker
-                </Typography>
-                <Chip
-                  label="PWA"
-                  size="small"
-                  sx={{
-                    height: 18,
-                    fontSize: '0.65rem',
-                    fontWeight: 800,
-                    backgroundColor: '#eff6ff',
-                    color: '#1d4ed8',
-                    border: '1px solid #bfdbfe',
-                  }}
-                />
-              </Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#0f172a', lineHeight: 1.2 }}>
+                SAMMLocker
+              </Typography>
               <Typography variant="caption" sx={{ color: '#64748b', display: { xs: 'none', sm: 'block' }, fontSize: '0.72rem', fontWeight: 600 }}>
                 ระบบสอบออนไลน์แบบล็อกหน้าจอ (WCAG AA)
               </Typography>
@@ -178,23 +164,9 @@ export default function Navbar({
             <ShieldCheck className="w-5 h-5" />
           </Box>
           <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'text.primary', lineHeight: 1.2 }}>
-                SAMMLocker
-              </Typography>
-              <Chip
-                label="PWA"
-                size="small"
-                sx={{
-                  height: 18,
-                  fontSize: '0.65rem',
-                  fontWeight: 800,
-                  backgroundColor: '#eff6ff',
-                  color: '#1d4ed8',
-                  border: '1px solid #bfdbfe',
-                }}
-              />
-            </Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'text.primary', lineHeight: 1.2 }}>
+              SAMMLocker
+            </Typography>
             <Typography variant="caption" sx={{ color: 'text.secondary', display: { xs: 'none', sm: 'block' }, fontSize: '0.72rem' }}>
               ระบบสอบออนไลน์แบบล็อกหน้าจอ (WCAG AA)
             </Typography>
