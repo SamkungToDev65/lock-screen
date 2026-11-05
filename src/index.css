@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Sarabun', 'Prompt', system-ui, sans-serif;
+  }
+  
+  /* Focus styles for WCAG AA compliance */
+  *:focus-visible {
+    outline: 3px solid #2563eb;
+    outline-offset: 2px;
+  }
+}
+
+/* Pulsing alert animation for security breaches */
+@keyframes pulse-danger {
+  0%, 100% {
+    background-color: rgba(220, 38, 38, 0.15);
+  }
+  50% {
+    background-color: rgba(220, 38, 38, 0.35);
+  }
+}
+
+.animate-pulse-danger {
+  animation: pulse-danger 1.5s infinite;
+}
+
+/* Prevent text selection in secure exam mode */
+.no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+

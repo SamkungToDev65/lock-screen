@@ -1,0 +1,19 @@
+# SAMMLocker Apache Configuration
+# Directory: /var/www/html/api/SammLocker
+
+Options -Indexes
+DirectoryIndex index.php
+
+<IfModule mod_headers.c>
+    Header always set Access-Control-Allow-Origin "*"
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, Origin, Accept"
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # Handle CORS OPTIONS early
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^(.*)$ $1 [R=200,L]
+</IfModule>
+
