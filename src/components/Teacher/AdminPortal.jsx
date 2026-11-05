@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Container,
@@ -58,6 +58,8 @@ import {
   Eye,
   Clock,
   Activity,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import {
   listRooms,
@@ -196,13 +198,51 @@ export default function AdminPortal({
     }
   };
 
-  const filteredStudents = allStudents.filter((s) => {
-    const matchRoom = selectedRoomFilter === 'ALL' || s.roomCode.toUpperCase() === selectedRoomFilter.toUpperCase();
-    const matchQuery =
-      (s.studentName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (s.studentId || '').toLowerCase().includes(searchQuery.toLowerCase());
-    return matchRoom && matchQuery;
-  });
+  // Pagination State for Students (Tab 1)
+  const [studentPageSize, setStudentPageSize] = useState(25);
+  const [studentPage, setStudentPage] = useState(1);
+
+  // Pagination State for Audit Logs (Tab 2)
+  const [logPageSize, setLogPageSize] = useState(25);
+  const [logPage, setLogPage] = useState(1);
+
+  const filteredStudents = useMemo(() => {
+    return allStudents.filter((s) => {
+      const matchRoom = selectedRoomFilter === 'ALL' || s.roomCode.toUpperCase() === selectedRoomFilter.toUpperCase();
+      const matchQuery =
+        (s.studentName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (s.studentId || '').toLowerCase().includes(searchQuery.toLowerCase());
+      return matchRoom && matchQuery;
+    });
+  }, [allStudents, selectedRoomFilter, searchQuery]);
+
+  // Reset student page when filter or search changes
+  useEffect(() => {
+    setStudentPage(1);
+  }, [selectedRoomFilter, searchQuery, studentPageSize]);
+
+  const totalFilteredStudents = filteredStudents.length;
+  const isAllStudents = studentPageSize === 'ALL';
+  const studentLimit = isAllStudents ? totalFilteredStudents : Number(studentPageSize);
+  const totalStudentPages = isAllStudents ? 1 : Math.max(1, Math.ceil(totalFilteredStudents / studentLimit));
+
+  const paginatedStudents = useMemo(() => {
+    if (isAllStudents) return filteredStudents;
+    const start = (studentPage - 1) * studentLimit;
+    return filteredStudents.slice(start, start + studentLimit);
+  }, [filteredStudents, studentPage, studentLimit, isAllStudents]);
+
+  // Pagination for logs
+  const totalLogs = allLogs.length;
+  const isAllLogs = logPageSize === 'ALL';
+  const logLimit = isAllLogs ? totalLogs : Number(logPageSize);
+  const totalLogPages = isAllLogs ? 1 : Math.max(1, Math.ceil(totalLogs / logLimit));
+
+  const paginatedLogs = useMemo(() => {
+    if (isAllLogs) return allLogs;
+    const start = (logPage - 1) * logLimit;
+    return allLogs.slice(start, start + logLimit);
+  }, [allLogs, logPage, logLimit, isAllLogs]);
 
   return (
     <Container maxWidth="xl" sx={{ py: { xs: 2.5, md: 4 }, px: { xs: 2, sm: 3 } }}>
@@ -649,7 +689,7 @@ export default function AdminPortal({
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredStudents.map((s) => (
+                    paginatedStudents.map((s) => (
                       <TableRow key={s.studentId + s.roomCode} hover>
                         <TableCell sx={{ fontFamily: 'monospace', fontWeight: 700 }}>
                           {s.roomCode}
@@ -754,7 +794,7 @@ export default function AdminPortal({
               </Paper>
             ) : (
               <Stack spacing={1.5}>
-                {filteredStudents.map((s) => {
+                {paginatedStudents.map((s) => {
                   const isViolation = s.violations > 0;
                   return (
                     <Paper
@@ -867,6 +907,82 @@ export default function AdminPortal({
               </Stack>
             )}
           </Box>
+
+          {/* PAGINATION TOOLBAR FOR STUDENTS */}
+          {totalFilteredStudents > 0 && (
+            <Paper
+              elevation={0}
+              variant="outlined"
+              sx={{
+                p: { xs: 1.5, sm: 2 },
+                borderRadius: 3,
+                backgroundColor: '#ffffff',
+                borderColor: '#e2e8f0',
+                display: 'flex',
+                flexDirection: { xs: 'column', sm: 'row' },
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 2,
+              }}
+            >
+              <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.85rem' }}>
+                แสดง {totalFilteredStudents === 0 ? 0 : (studentPage - 1) * studentLimit + 1} -{' '}
+                {isAllStudents ? totalFilteredStudents : Math.min(studentPage * studentLimit, totalFilteredStudents)} จากทั้งหมด{' '}
+                <strong style={{ color: '#0f172a' }}>{totalFilteredStudents}</strong> คน
+              </Typography>
+
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
+                {/* Page size selector */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>
+                    แสดงทีละ:
+                  </Typography>
+                  <Select
+                    size="small"
+                    value={studentPageSize}
+                    onChange={(e) => setStudentPageSize(e.target.value)}
+                    sx={{ height: 32, fontSize: '0.8rem', fontWeight: 700, borderRadius: 2 }}
+                  >
+                    <MenuItem value={25}>25 คน</MenuItem>
+                    <MenuItem value={50}>50 คน</MenuItem>
+                    <MenuItem value={100}>100 คน</MenuItem>
+                    <MenuItem value="ALL">ทั้งหมด ({totalFilteredStudents})</MenuItem>
+                  </Select>
+                </Box>
+
+                {/* Page Navigation */}
+                {!isAllStudents && totalStudentPages > 1 && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      disabled={studentPage === 1}
+                      onClick={() => setStudentPage((p) => Math.max(1, p - 1))}
+                      startIcon={<ChevronLeft className="w-4 h-4" />}
+                      sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2, px: 1.2, height: 32 }}
+                    >
+                      ก่อนหน้า
+                    </Button>
+
+                    <Box sx={{ px: 1.5, py: 0.5, borderRadius: 2, backgroundColor: '#f1f5f9', fontWeight: 800, fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                      {studentPage} / {totalStudentPages}
+                    </Box>
+
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      disabled={studentPage === totalStudentPages}
+                      onClick={() => setStudentPage((p) => Math.min(totalStudentPages, p + 1))}
+                      endIcon={<ChevronRight className="w-4 h-4" />}
+                      sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2, px: 1.2, height: 32 }}
+                    >
+                      ถัดไป
+                    </Button>
+                  </Box>
+                )}
+              </Box>
+            </Paper>
+          )}
         </Stack>
       )}
 
@@ -921,7 +1037,7 @@ export default function AdminPortal({
                       </TableCell>
                     </TableRow>
                   ) : (
-                    allLogs.map((log, index) => {
+                    paginatedLogs.map((log, index) => {
                       const isAlert =
                         log.eventType === 'LEFT_FULLSCREEN' ||
                         log.eventType === 'TAB_SWITCH' ||
@@ -983,7 +1099,7 @@ export default function AdminPortal({
               </Paper>
             ) : (
               <Stack spacing={1.5}>
-                {allLogs.map((log, index) => {
+                {paginatedLogs.map((log, index) => {
                   const isAlert =
                     log.eventType === 'LEFT_FULLSCREEN' ||
                     log.eventType === 'TAB_SWITCH' ||
@@ -1036,6 +1152,80 @@ export default function AdminPortal({
               </Stack>
             )}
           </Box>
+
+          {/* PAGINATION TOOLBAR FOR LOGS */}
+          {totalLogs > 0 && (
+            <Paper
+              elevation={0}
+              variant="outlined"
+              sx={{
+                p: { xs: 1.5, sm: 2 },
+                borderRadius: 3,
+                backgroundColor: '#ffffff',
+                borderColor: '#e2e8f0',
+                display: 'flex',
+                flexDirection: { xs: 'column', sm: 'row' },
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 2,
+              }}
+            >
+              <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.85rem' }}>
+                แสดง {totalLogs === 0 ? 0 : (logPage - 1) * logLimit + 1} -{' '}
+                {isAllLogs ? totalLogs : Math.min(logPage * logLimit, totalLogs)} จากทั้งหมด{' '}
+                <strong style={{ color: '#0f172a' }}>{totalLogs}</strong> รายการ
+              </Typography>
+
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>
+                    แสดงทีละ:
+                  </Typography>
+                  <Select
+                    size="small"
+                    value={logPageSize}
+                    onChange={(e) => setLogPageSize(e.target.value)}
+                    sx={{ height: 32, fontSize: '0.8rem', fontWeight: 700, borderRadius: 2 }}
+                  >
+                    <MenuItem value={25}>25 รายการ</MenuItem>
+                    <MenuItem value={50}>50 รายการ</MenuItem>
+                    <MenuItem value={100}>100 รายการ</MenuItem>
+                    <MenuItem value="ALL">ทั้งหมด ({totalLogs})</MenuItem>
+                  </Select>
+                </Box>
+
+                {!isAllLogs && totalLogPages > 1 && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      disabled={logPage === 1}
+                      onClick={() => setLogPage((p) => Math.max(1, p - 1))}
+                      startIcon={<ChevronLeft className="w-4 h-4" />}
+                      sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2, px: 1.2, height: 32 }}
+                    >
+                      ก่อนหน้า
+                    </Button>
+
+                    <Box sx={{ px: 1.5, py: 0.5, borderRadius: 2, backgroundColor: '#f1f5f9', fontWeight: 800, fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                      {logPage} / {totalLogPages}
+                    </Box>
+
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      disabled={logPage === totalLogPages}
+                      onClick={() => setLogPage((p) => Math.min(totalLogPages, p + 1))}
+                      endIcon={<ChevronRight className="w-4 h-4" />}
+                      sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2, px: 1.2, height: 32 }}
+                    >
+                      ถัดไป
+                    </Button>
+                  </Box>
+                )}
+              </Box>
+            </Paper>
+          )}
         </Stack>
       )}
 

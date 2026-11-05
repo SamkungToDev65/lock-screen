@@ -546,11 +546,11 @@ export const forceSubmitStudent = async (roomCode, studentId) => {
 };
 
 /**
- * Fetch real-time dashboard data from MariaDB Backend
+ * Fetch real-time dashboard data from MariaDB Backend (High Performance & Paginated)
  */
-export const getDashboardData = async (roomCode, bypassCache = false) => {
+export const getDashboardData = async (roomCode, bypassCache = false, limit = 0, offset = 0) => {
   const normalized = roomCode ? roomCode.toUpperCase().trim() : '';
-  const cacheKey = 'dash_' + normalized;
+  const cacheKey = `dash_${normalized}_${limit}_${offset}`;
 
   if (!bypassCache) {
     const cached = getCache(cacheKey);
@@ -558,23 +558,27 @@ export const getDashboardData = async (roomCode, bypassCache = false) => {
   }
 
   try {
-    const data = await apiGet({
+    const params = {
       action: 'getDashboard',
       roomCode: normalized,
-    });
+    };
+    if (limit > 0) {
+      params.limit = limit;
+      params.offset = offset;
+    }
+
+    const data = await apiGet(params);
 
     if (data && data.success) {
-      if (data.students) localStorage.setItem(LOCAL_STUDENTS_KEY, JSON.stringify(data.students));
-      if (data.logs) localStorage.setItem(LOCAL_LOGS_KEY, JSON.stringify(data.logs));
-
       const result = {
         success: true,
         students: data.students || [],
+        totalStudents: data.totalStudents !== undefined ? data.totalStudents : (data.students || []).length,
         logs: data.logs || [],
         source: 'MARIADB_API',
       };
 
-      setCache(cacheKey, result, 2000);
+      setCache(cacheKey, result, 3000);
       return result;
     }
   } catch (err) {
@@ -594,7 +598,8 @@ export const getDashboardData = async (roomCode, bypassCache = false) => {
 
   return {
     success: true,
-    students: filteredStudents,
+    students: limit > 0 ? filteredStudents.slice(offset, offset + limit) : filteredStudents,
+    totalStudents: filteredStudents.length,
     logs: filteredLogs.slice(-50).reverse(),
     source: 'LOCAL_SYNC',
   };

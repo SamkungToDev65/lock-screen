@@ -396,17 +396,36 @@ switch ($action) {
         break;
 
     // ----------------------------------------------------
-    // 13. Get Real-Time Dashboard
+    // 13. Get Real-Time Dashboard (Optimized with Limit & Offset)
     // ----------------------------------------------------
     case 'getDashboard':
         $roomCode = isset($params['roomCode']) ? strtoupper(trim($params['roomCode'])) : '';
+        $limit = isset($params['limit']) ? max(0, (int)$params['limit']) : 0;
+        $offset = isset($params['offset']) ? max(0, (int)$params['offset']) : 0;
 
-        // Query Students
+        // Count total students for accurate pagination
         if (!empty($roomCode)) {
-            $stmtStudents = $pdo->prepare("SELECT * FROM `students` WHERE UPPER(`room_code`) = ? ORDER BY `id` DESC");
+            $countStmt = $pdo->prepare("SELECT COUNT(*) FROM `students` WHERE UPPER(`room_code`) = ?");
+            $countStmt->execute([$roomCode]);
+        } else {
+            $countStmt = $pdo->query("SELECT COUNT(*) FROM `students`");
+        }
+        $totalStudents = (int)$countStmt->fetchColumn();
+
+        // Query Students (Paginated if limit > 0)
+        if (!empty($roomCode)) {
+            $sql = "SELECT * FROM `students` WHERE UPPER(`room_code`) = ? ORDER BY `id` DESC";
+            if ($limit > 0) {
+                $sql .= " LIMIT {$limit} OFFSET {$offset}";
+            }
+            $stmtStudents = $pdo->prepare($sql);
             $stmtStudents->execute([$roomCode]);
         } else {
-            $stmtStudents = $pdo->query("SELECT * FROM `students` ORDER BY `id` DESC");
+            $sql = "SELECT * FROM `students` ORDER BY `id` DESC";
+            if ($limit > 0) {
+                $sql .= " LIMIT {$limit} OFFSET {$offset}";
+            }
+            $stmtStudents = $pdo->query($sql);
         }
 
         $students = [];
@@ -447,6 +466,9 @@ switch ($action) {
             'success' => true,
             'roomCode' => $roomCode,
             'students' => $students,
+            'totalStudents' => $totalStudents,
+            'limit' => $limit,
+            'offset' => $offset,
             'logs' => $logs
         ]);
         break;

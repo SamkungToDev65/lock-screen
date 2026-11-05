@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -46,6 +46,8 @@ import {
   RotateCcw,
   Check,
   Laptop,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import {
   getDashboardData,
@@ -218,21 +220,43 @@ export default function TeacherDashboard({
     }
   };
 
-  const filteredStudents = students.filter((s) => {
-    const matchSearch =
-      (s.studentName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (s.studentId || '').toLowerCase().includes(searchTerm.toLowerCase());
+  // Pagination State (Default: 25 items per page)
+  const [pageSize, setPageSize] = useState(25);
+  const [currentPage, setCurrentPage] = useState(1);
 
-    if (!matchSearch) return false;
+  const filteredStudents = useMemo(() => {
+    return students.filter((s) => {
+      const matchSearch =
+        (s.studentName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s.studentId || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-    if (statusFilter === 'ALL') return true;
-    if (statusFilter === 'ACTIVE') return s.status === 'ACTIVE';
-    if (statusFilter === 'WARNING')
-      return s.status === 'BLUR' || s.status === 'LEFT_FULLSCREEN' || s.status === 'TAB_SWITCH' || s.violations > 0;
-    if (statusFilter === 'SUBMITTED') return s.status === 'SUBMITTED';
+      if (!matchSearch) return false;
 
-    return true;
-  });
+      if (statusFilter === 'ALL') return true;
+      if (statusFilter === 'ACTIVE') return s.status === 'ACTIVE';
+      if (statusFilter === 'WARNING')
+        return s.status === 'BLUR' || s.status === 'LEFT_FULLSCREEN' || s.status === 'TAB_SWITCH' || s.violations > 0;
+      if (statusFilter === 'SUBMITTED') return s.status === 'SUBMITTED';
+
+      return true;
+    });
+  }, [students, searchTerm, statusFilter]);
+
+  // Reset page when filter/search/pageSize changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, pageSize]);
+
+  const totalFilteredStudents = filteredStudents.length;
+  const isAllStudents = pageSize === 'ALL';
+  const studentLimit = isAllStudents ? totalFilteredStudents : Number(pageSize);
+  const totalStudentPages = isAllStudents ? 1 : Math.max(1, Math.ceil(totalFilteredStudents / studentLimit));
+
+  const paginatedStudents = useMemo(() => {
+    if (isAllStudents) return filteredStudents;
+    const start = (currentPage - 1) * studentLimit;
+    return filteredStudents.slice(start, start + studentLimit);
+  }, [filteredStudents, currentPage, studentLimit, isAllStudents]);
 
   const totalCount = students.length;
   const activeCount = students.filter((s) => s.status === 'ACTIVE').length;
@@ -664,7 +688,7 @@ export default function TeacherDashboard({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredStudents.map((s) => {
+                  paginatedStudents.map((s) => {
                     const isViolation = s.violations > 0;
                     return (
                       <TableRow key={s.studentId} hover sx={{ backgroundColor: isViolation ? 'rgba(254, 242, 242, 0.35)' : undefined }}>
@@ -765,7 +789,7 @@ export default function TeacherDashboard({
               </Box>
             ) : (
               <Stack spacing={1.5}>
-                {filteredStudents.map((s) => {
+                {paginatedStudents.map((s) => {
                   const isViolation = s.violations > 0;
                   return (
                     <Paper
@@ -865,6 +889,77 @@ export default function TeacherDashboard({
               </Stack>
             )}
           </Box>
+
+          {/* PAGINATION TOOLBAR FOR ROOM STUDENTS */}
+          {totalFilteredStudents > 0 && (
+            <Box
+              sx={{
+                p: { xs: 1.5, sm: 2 },
+                backgroundColor: '#ffffff',
+                borderTop: '1px solid #e2e8f0',
+                display: 'flex',
+                flexDirection: { xs: 'column', sm: 'row' },
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 1.5,
+              }}
+            >
+              <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.82rem' }}>
+                แสดง {totalFilteredStudents === 0 ? 0 : (currentPage - 1) * studentLimit + 1} -{' '}
+                {isAllStudents ? totalFilteredStudents : Math.min(currentPage * studentLimit, totalFilteredStudents)} จากทั้งหมด{' '}
+                <strong style={{ color: '#0f172a' }}>{totalFilteredStudents}</strong> คน
+              </Typography>
+
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>
+                    แสดงทีละ:
+                  </Typography>
+                  <Select
+                    size="small"
+                    value={pageSize}
+                    onChange={(e) => setPageSize(e.target.value)}
+                    sx={{ height: 32, fontSize: '0.8rem', fontWeight: 700, borderRadius: 2 }}
+                  >
+                    <MenuItem value={25}>25 คน</MenuItem>
+                    <MenuItem value={50}>50 คน</MenuItem>
+                    <MenuItem value={100}>100 คน</MenuItem>
+                    <MenuItem value="ALL">ทั้งหมด ({totalFilteredStudents})</MenuItem>
+                  </Select>
+                </Box>
+
+                {!isAllStudents && totalStudentPages > 1 && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      startIcon={<ChevronLeft className="w-4 h-4" />}
+                      sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2, px: 1.2, height: 32 }}
+                    >
+                      ก่อนหน้า
+                    </Button>
+
+                    <Box sx={{ px: 1.5, py: 0.5, borderRadius: 2, backgroundColor: '#f1f5f9', fontWeight: 800, fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                      {currentPage} / {totalStudentPages}
+                    </Box>
+
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      disabled={currentPage === totalStudentPages}
+                      onClick={() => setCurrentPage((p) => Math.min(totalStudentPages, p + 1))}
+                      endIcon={<ChevronRight className="w-4 h-4" />}
+                      sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2, px: 1.2, height: 32 }}
+                    >
+                      ถัดไป
+                    </Button>
+                  </Box>
+                )}
+              </Box>
+            </Box>
+          )}
 
           {/* Integrated Card Footer - pinned cleanly at the bottom */}
           <Box
