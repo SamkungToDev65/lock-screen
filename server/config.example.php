@@ -4,8 +4,13 @@
  * คัดลอกไฟล์นี้เป็น config.php และกรอกรหัสผ่านฐานข้อมูลของท่าน
  */
 
+// Set PHP Default Timezone to Thailand (Asia/Bangkok UTC+7)
+date_default_timezone_set('Asia/Bangkok');
+
 // Allow CORS from any origin
-header("Access-Control-Allow-Origin: *");
+$origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '*';
+
+header("Access-Control-Allow-Origin: {$origin}");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Origin, Accept");
 header("Access-Control-Max-Age: 86400");

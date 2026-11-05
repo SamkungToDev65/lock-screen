@@ -11,7 +11,7 @@ import {
   IconButton,
 } from '@mui/material';
 import { QRCodeSVG } from 'qrcode.react';
-import { X, Maximize2, Users, ShieldCheck, KeyRound, Sparkles } from 'lucide-react';
+import { X, Maximize2, Users, ShieldCheck, KeyRound, Sparkles, Lock } from 'lucide-react';
 
 export default function ProjectorModal({ open, onClose, room, studentCount = 0 }) {
   if (!room) return null;
@@ -203,8 +203,9 @@ export default function ProjectorModal({ open, onClose, room, studentCount = 0 }
 
         {/* Bottom Rules Banner */}
         <Box sx={{ pt: 3, borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-          <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 600 }}>
-            🔒 ระบบจะเข้าสู่โหมด Fullscreen ทันทีเมื่อเริ่มทำข้อสอบ • ห้ามสลับแท็บ • ห้ามออกจากหน้าจอ
+          <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            <Lock className="w-3.5 h-3.5 text-slate-400" />
+            ระบบจะเข้าสู่โหมด Fullscreen ทันทีเมื่อเริ่มทำข้อสอบ • ห้ามสลับแท็บ • ห้ามออกจากหน้าจอ
           </Typography>
           <Typography variant="caption" sx={{ color: '#fbbf24', fontWeight: 700 }}>
             Exit PIN: สำหรับให้อาจารย์ปลดล็อกเมื่อส่งข้อสอบ

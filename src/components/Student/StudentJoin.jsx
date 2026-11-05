@@ -255,8 +255,9 @@ export default function StudentJoin({
                     <Typography variant="body2" sx={{ fontWeight: 800, color: '#1e3a8a' }}>
                       {roomInfo.title}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#2563eb', fontWeight: 600 }}>
-                      ✓ ห้องสอบพร้อมเริ่มทำข้อสอบ
+                    <Typography variant="caption" sx={{ color: '#2563eb', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
+                      ห้องสอบพร้อมเริ่มทำข้อสอบ
                     </Typography>
                   </Box>
                 </Paper>

@@ -122,7 +122,7 @@ export default function TeacherLogin({
       if (res.success) {
         if (onLoginSuccess) onLoginSuccess();
       } else {
-        setErrorTeacher(res.error || 'เข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบข้อมูลใน Sheet Admin');
+        setErrorTeacher(res.error || 'เข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบข้อมูลในฐานข้อมูล admins');
       }
     } catch (err) {
       setErrorTeacher(err.message || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
@@ -156,7 +156,7 @@ export default function TeacherLogin({
     try {
       const rRes = await getRoom(roomCode.trim());
       if (!rRes.success || !rRes.room) {
-        setErrorStudent(rRes.error || 'ไม่พบห้องสอบที่ระบุใน Google Sheet กรุณาตรวจสอบรหัสห้องอีกครั้ง');
+        setErrorStudent(rRes.error || 'ไม่พบห้องสอบที่ระบุ กรุณาตรวจสอบรหัสห้องอีกครั้ง');
         setLoadingStudent(false);
         return;
       }
@@ -277,7 +277,7 @@ export default function TeacherLogin({
               }}
             />
 
-            {/* Decorative bottom wave curve matching sidebar */}
+            {/* Decorative animated moving waves (3-layer multi-speed wave) */}
             <Box
               sx={{
                 position: 'absolute',
@@ -290,34 +290,125 @@ export default function TeacherLogin({
                 zIndex: 0,
               }}
             >
+              <style>{`
+                @keyframes loginWaveSlide1 {
+                  0% { transform: translate3d(0, 0, 0); }
+                  100% { transform: translate3d(-50%, 0, 0); }
+                }
+                @keyframes loginWaveSlide2 {
+                  0% { transform: translate3d(-50%, 0, 0); }
+                  100% { transform: translate3d(0, 0, 0); }
+                }
+                @keyframes loginWaveSlide3 {
+                  0% { transform: translate3d(0, 0, 0); }
+                  100% { transform: translate3d(-50%, 0, 0); }
+                }
+                @keyframes loginWaveBob {
+                  0%, 100% { transform: translateY(0); }
+                  50% { transform: translateY(5px); }
+                }
+              `}</style>
+
+              {/* Layer 1: Deep slow ocean wave */}
               <svg
-                viewBox="0 0 260 140"
+                viewBox="0 0 1200 140"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
                 preserveAspectRatio="none"
-                style={{ width: '100%', height: '100%', position: 'absolute', bottom: 0, left: 0 }}
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  width: '200%',
+                  height: '100%',
+                  animation: 'loginWaveSlide1 18s linear infinite',
+                  opacity: 0.25,
+                  willChange: 'transform',
+                }}
               >
                 <path
-                  d="M-20 90 C 60 130, 150 40, 280 85 L 280 140 L -20 140 Z"
-                  fill="url(#login-wave-gradient-1)"
-                  opacity="0.35"
-                />
-                <path
-                  d="M-20 110 C 70 70, 160 120, 280 75 L 280 140 L -20 140 Z"
-                  fill="url(#login-wave-gradient-2)"
-                  opacity="0.55"
+                  d="M 0 50 Q 150 15, 300 50 T 600 50 Q 750 15, 900 50 T 1200 50 L 1200 140 L 0 140 Z"
+                  fill="url(#login-wave-grad-1)"
                 />
                 <defs>
-                  <linearGradient id="login-wave-gradient-1" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#1e40af" />
-                    <stop offset="100%" stopColor="#3b82f6" />
-                  </linearGradient>
-                  <linearGradient id="login-wave-gradient-2" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#0284c7" />
-                    <stop offset="100%" stopColor="#60a5fa" />
+                  <linearGradient id="login-wave-grad-1" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#1e3a8a" />
+                    <stop offset="50%" stopColor="#2563eb" />
+                    <stop offset="100%" stopColor="#1e3a8a" />
                   </linearGradient>
                 </defs>
               </svg>
+
+              {/* Layer 2: Middle counter-flow wave */}
+              <svg
+                viewBox="0 0 1200 140"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                preserveAspectRatio="none"
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  width: '200%',
+                  height: '100%',
+                  animation: 'loginWaveSlide2 12s linear infinite',
+                  opacity: 0.42,
+                  willChange: 'transform',
+                }}
+              >
+                <path
+                  d="M 0 70 Q 150 110, 300 70 T 600 70 Q 750 110, 900 70 T 1200 70 L 1200 140 L 0 140 Z"
+                  fill="url(#login-wave-grad-2)"
+                />
+                <defs>
+                  <linearGradient id="login-wave-grad-2" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#0284c7" />
+                    <stop offset="50%" stopColor="#38bdf8" />
+                    <stop offset="100%" stopColor="#0284c7" />
+                  </linearGradient>
+                </defs>
+              </svg>
+
+              {/* Layer 3: Foreground luminous crest wave with gentle undulating bob */}
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  animation: 'loginWaveBob 6s ease-in-out infinite',
+                }}
+              >
+                <svg
+                  viewBox="0 0 1200 140"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  preserveAspectRatio="none"
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    width: '200%',
+                    height: '100%',
+                    animation: 'loginWaveSlide3 7.5s linear infinite',
+                    opacity: 0.6,
+                    willChange: 'transform',
+                  }}
+                >
+                  <path
+                    d="M 0 85 Q 150 45, 300 85 T 600 85 Q 750 45, 900 85 T 1200 85 L 1200 140 L 0 140 Z"
+                    fill="url(#login-wave-grad-3)"
+                  />
+                  <defs>
+                    <linearGradient id="login-wave-grad-3" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#3b82f6" />
+                      <stop offset="50%" stopColor="#60a5fa" />
+                      <stop offset="100%" stopColor="#3b82f6" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
             </Box>
 
             {/* Top Brand & Title */}
@@ -456,7 +547,7 @@ export default function TeacherLogin({
                     <CheckCircle2 className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
                     <Box>
                       <Typography variant="body2" sx={{ color: '#ffffff', fontWeight: 700, fontSize: '0.88rem' }}>
-                        บันทึกผลสดลง Google Sheets เรียลไทม์
+                        บันทึกผลสดลงฐานข้อมูล MariaDB เรียลไทม์
                       </Typography>
                       <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.76rem', display: 'block', mt: 0.4 }}>
                         จัดเก็บห้องสอบ รายชื่อผู้สอบ และ Audit Trail สดตลอดการสอบ
@@ -778,7 +869,7 @@ export default function TeacherLogin({
 
                       <Typography
                         variant="caption"
-                        onClick={() => alert('หากลืมรหัสผ่าน กรุณาตรวจสอบหรือรีเซ็ตรหัสผ่านใน Google Sheet ตาราง Admin')}
+                        onClick={() => alert('หากลืมรหัสผ่าน กรุณาติดต่อผู้ดูแลระบบเพื่อรีเซ็ตรหัสผ่าน')}
                         sx={{
                           color: '#2563eb',
                           fontWeight: 700,
@@ -957,7 +1048,8 @@ export default function TeacherLogin({
                               mt: 0.3,
                             }}
                           >
-                            ✓ ห้องสอบพร้อมเริ่มทำข้อสอบ
+                            <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
+                            ห้องสอบพร้อมเริ่มทำข้อสอบ
                           </Typography>
                         </Box>
                       </Paper>

@@ -5,6 +5,9 @@
  * Endpoint: https://dashboard.bcnlp.ac.th/api/SammLocker
  */
 
+// Enforce Asia/Bangkok Timezone (Thailand UTC+7)
+date_default_timezone_set('Asia/Bangkok');
+
 if (file_exists(__DIR__ . '/config.php')) {
     require_once __DIR__ . '/config.php';
 } else {
@@ -272,7 +275,10 @@ switch ($action) {
         $studentName = isset($params['studentName']) ? trim($params['studentName']) : '';
         $eventType = isset($params['eventType']) ? trim($params['eventType']) : 'WINDOW_BLUR';
         $details = isset($params['details']) ? trim($params['details']) : 'ตรวจพบการละเมิดกฎการสอบ';
-        $now = date('Y-m-d H:i:s');
+        
+        // Extract client timestamp if provided (format: YYYY-MM-DD HH:mm:ss)
+        $clientTimestamp = isset($params['clientTimestamp']) ? trim($params['clientTimestamp']) : (isset($params['timestamp']) ? trim($params['timestamp']) : null);
+        $now = ($clientTimestamp && preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $clientTimestamp)) ? $clientTimestamp : date('Y-m-d H:i:s');
 
         if (empty($roomCode) || empty($studentId)) {
             sendResponse(['success' => false, 'error' => 'Missing roomCode or studentId'], 400);
@@ -295,7 +301,7 @@ switch ($action) {
             $insert->execute([$roomCode, $studentId, $studentName, $now, $eventType, $now]);
         }
 
-        logAudit($pdo, $roomCode, $studentId, $studentName, $eventType, $details);
+        logAudit($pdo, $roomCode, $studentId, $studentName, $eventType, $details, $now);
 
         sendResponse([
             'success' => true,
@@ -369,6 +375,24 @@ switch ($action) {
         logAudit($pdo, $roomCode, $studentId, '', 'FORCE_SUBMITTED', 'อาจารย์สั่งส่งข้อสอบแทน (Teacher Override)');
 
         sendResponse(['success' => true, 'message' => 'ส่งข้อสอบแทนสำเร็จ']);
+        break;
+
+    // ----------------------------------------------------
+    // 12.1 Student Heartbeat / Status Ping
+    // ----------------------------------------------------
+    case 'heartbeat':
+    case 'updateStudentStatus':
+        $roomCode = isset($params['roomCode']) ? strtoupper(trim($params['roomCode'])) : '';
+        $studentId = isset($params['studentId']) ? trim($params['studentId']) : '';
+        $status = isset($params['status']) ? trim($params['status']) : 'ACTIVE';
+        $now = date('Y-m-d H:i:s');
+
+        if (!empty($roomCode) && !empty($studentId)) {
+            $stmt = $pdo->prepare("UPDATE `students` SET `status` = ?, `last_ping` = ? WHERE UPPER(`room_code`) = ? AND `student_id` = ?");
+            $stmt->execute([$status, $now, $roomCode, $studentId]);
+        }
+
+        sendResponse(['success' => true]);
         break;
 
     // ----------------------------------------------------
@@ -446,11 +470,11 @@ switch ($action) {
 }
 
 /**
- * Helper to record audit events into logs table
+ * Helper to record audit events into logs table (Defaulting to Thailand Asia/Bangkok time)
  */
-function logAudit($pdo, $roomCode, $studentId, $studentName, $eventType, $details) {
+function logAudit($pdo, $roomCode, $studentId, $studentName, $eventType, $details, $customTime = null) {
     try {
-        $now = date('Y-m-d H:i:s');
+        $now = ($customTime && preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $customTime)) ? $customTime : date('Y-m-d H:i:s');
         $stmt = $pdo->prepare("INSERT INTO `logs` (`timestamp`, `room_code`, `student_id`, `student_name`, `event_type`, `details`) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->execute([$now, $roomCode, $studentId, $studentName, $eventType, $details]);
     } catch (Exception $e) {

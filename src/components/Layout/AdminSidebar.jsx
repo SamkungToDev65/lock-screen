@@ -49,6 +49,8 @@ export default function AdminSidebar({ currentTab, onSelectTab, onOpenSettings }
     <Box
       sx={{
         width: 260,
+        height: '100%',
+        minHeight: '100vh',
         flexShrink: 0,
         background: 'linear-gradient(180deg, #07153b 0%, #0a2052 50%, #061536 100%)',
         color: '#ffffff',
@@ -56,13 +58,15 @@ export default function AdminSidebar({ currentTab, onSelectTab, onOpenSettings }
         flexDirection: 'column',
         justifyContent: 'space-between',
         borderRight: '1px solid rgba(255, 255, 255, 0.08)',
-        minHeight: '100vh',
         p: 2.5,
         position: 'relative',
-        overflow: 'hidden',
+        overflowX: 'hidden',
+        overflowY: 'auto',
+        '&::-webkit-scrollbar': { width: '4px' },
+        '&::-webkit-scrollbar-thumb': { backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '4px' },
       }}
     >
-      {/* Decorative Wave at the Bottom matching Image 1 */}
+      {/* Decorative animated moving waves matching login screen */}
       <Box
         sx={{
           position: 'absolute',
@@ -75,34 +79,125 @@ export default function AdminSidebar({ currentTab, onSelectTab, onOpenSettings }
           zIndex: 0,
         }}
       >
+        <style>{`
+          @keyframes sidebarWaveSlide1 {
+            0% { transform: translate3d(0, 0, 0); }
+            100% { transform: translate3d(-50%, 0, 0); }
+          }
+          @keyframes sidebarWaveSlide2 {
+            0% { transform: translate3d(-50%, 0, 0); }
+            100% { transform: translate3d(0, 0, 0); }
+          }
+          @keyframes sidebarWaveSlide3 {
+            0% { transform: translate3d(0, 0, 0); }
+            100% { transform: translate3d(-50%, 0, 0); }
+          }
+          @keyframes sidebarWaveBob {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(5px); }
+          }
+        `}</style>
+
+        {/* Layer 1: Deep slow ocean wave */}
         <svg
-          viewBox="0 0 260 140"
+          viewBox="0 0 1200 140"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
           preserveAspectRatio="none"
-          style={{ width: '100%', height: '100%', position: 'absolute', bottom: 0, left: 0 }}
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            width: '200%',
+            height: '100%',
+            animation: 'sidebarWaveSlide1 18s linear infinite',
+            opacity: 0.25,
+            willChange: 'transform',
+          }}
         >
           <path
-            d="M-20 90 C 60 130, 150 40, 280 85 L 280 140 L -20 140 Z"
-            fill="url(#sidebar-wave-gradient-1)"
-            opacity="0.35"
-          />
-          <path
-            d="M-20 110 C 70 70, 160 120, 280 75 L 280 140 L -20 140 Z"
-            fill="url(#sidebar-wave-gradient-2)"
-            opacity="0.55"
+            d="M 0 50 Q 150 15, 300 50 T 600 50 Q 750 15, 900 50 T 1200 50 L 1200 140 L 0 140 Z"
+            fill="url(#sidebar-wave-grad-1)"
           />
           <defs>
-            <linearGradient id="sidebar-wave-gradient-1" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#1e40af" />
-              <stop offset="100%" stopColor="#3b82f6" />
-            </linearGradient>
-            <linearGradient id="sidebar-wave-gradient-2" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#0284c7" />
-              <stop offset="100%" stopColor="#60a5fa" />
+            <linearGradient id="sidebar-wave-grad-1" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#1e3a8a" />
+              <stop offset="50%" stopColor="#2563eb" />
+              <stop offset="100%" stopColor="#1e3a8a" />
             </linearGradient>
           </defs>
         </svg>
+
+        {/* Layer 2: Middle counter-flow wave */}
+        <svg
+          viewBox="0 0 1200 140"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          preserveAspectRatio="none"
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            width: '200%',
+            height: '100%',
+            animation: 'sidebarWaveSlide2 12s linear infinite',
+            opacity: 0.42,
+            willChange: 'transform',
+          }}
+        >
+          <path
+            d="M 0 70 Q 150 110, 300 70 T 600 70 Q 750 110, 900 70 T 1200 70 L 1200 140 L 0 140 Z"
+            fill="url(#sidebar-wave-grad-2)"
+          />
+          <defs>
+            <linearGradient id="sidebar-wave-grad-2" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#0284c7" />
+              <stop offset="50%" stopColor="#38bdf8" />
+              <stop offset="100%" stopColor="#0284c7" />
+            </linearGradient>
+          </defs>
+        </svg>
+
+        {/* Layer 3: Foreground luminous crest wave with gentle undulating bob */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            animation: 'sidebarWaveBob 6s ease-in-out infinite',
+          }}
+        >
+          <svg
+            viewBox="0 0 1200 140"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            preserveAspectRatio="none"
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              width: '200%',
+              height: '100%',
+              animation: 'sidebarWaveSlide3 7.5s linear infinite',
+              opacity: 0.6,
+              willChange: 'transform',
+            }}
+          >
+            <path
+              d="M 0 85 Q 150 45, 300 85 T 600 85 Q 750 45, 900 85 T 1200 85 L 1200 140 L 0 140 Z"
+              fill="url(#sidebar-wave-grad-3)"
+            />
+            <defs>
+              <linearGradient id="sidebar-wave-grad-3" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#3b82f6" />
+                <stop offset="50%" stopColor="#60a5fa" />
+                <stop offset="100%" stopColor="#3b82f6" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
       </Box>
 
       {/* Top Brand Logo */}
@@ -202,7 +297,7 @@ export default function AdminSidebar({ currentTab, onSelectTab, onOpenSettings }
               cursor: 'pointer',
               '&:hover': { color: '#ffffff' },
             }}
-            onClick={() => window.open('https://docs.google.com/spreadsheets/d/1ymUruyobCQTdvyJ6X1uhoU5Zys9wulF4bciYvD1PRH4/edit', '_blank')}
+            onClick={onOpenSettings}
           >
             <BookOpen className="w-4 h-4 text-slate-400" />
             <Typography variant="caption" sx={{ fontWeight: 600 }}>คู่มือการใช้งาน</Typography>

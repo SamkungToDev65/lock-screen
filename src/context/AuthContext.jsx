@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { adminLoginSheet } from '../services/api';
+import { adminLogin } from '../services/api';
 
 const AuthContext = createContext(null);
 const AUTH_STORAGE_KEY = 'secure_exam_auth_user';
@@ -17,8 +17,8 @@ export function AuthProvider({ children }) {
   });
 
   const login = async (email, password) => {
-    // 1. Authenticate with Google Sheet `Admin` table
-    const res = await adminLoginSheet(email, password);
+    // 1. Authenticate with MariaDB `admins` table
+    const res = await adminLogin(email, password);
     if (res && res.success && res.user) {
       setUser(res.user);
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(res.user));
@@ -27,7 +27,7 @@ export function AuthProvider({ children }) {
 
     return {
       success: false,
-      error: res.error || 'อีเมลหรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบข้อมูลใน Sheet Admin',
+      error: res.error || 'อีเมลหรือรหัสผ่านไม่ถูกต้อง (ตรวจสอบในตาราง admins)',
     };
   };
 

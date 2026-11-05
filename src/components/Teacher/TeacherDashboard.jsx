@@ -23,6 +23,7 @@ import {
   ListItemIcon,
   ListItemText,
   Skeleton,
+  Divider,
 } from '@mui/material';
 import {
   Users,
@@ -53,6 +54,7 @@ import {
   forceSubmitStudent,
 } from '../../services/api';
 import { playViolationSound } from '../../utils/sound';
+import LiveAuditTimeline from './LiveAuditTimeline';
 
 export default function TeacherDashboard({
   onOpenCreateRoom,
@@ -161,7 +163,7 @@ export default function TeacherDashboard({
       if (isCancelled) return;
       await loadData(false);
       if (isCancelled) return;
-      // 5s when proctor tab is active, 15s if in background to save Google Apps Script quota
+      // 5s when proctor tab is active, 15s if in background to optimize bandwidth
       const intervalMs = document.hidden ? 15000 : 5000;
       timerId = setTimeout(poll, intervalMs);
     };
@@ -605,8 +607,8 @@ export default function TeacherDashboard({
             </Stack>
           </Box>
 
-          {/* Table Container flex 1 so it fills available space */}
-          <TableContainer sx={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}>
+          {/* DESKTOP VIEW: Full sticky table */}
+          <TableContainer sx={{ display: { xs: 'none', md: 'block' }, flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}>
             <Table stickyHeader>
               <TableHead>
                 <TableRow>
@@ -681,13 +683,20 @@ export default function TeacherDashboard({
                         </TableCell>
                         <TableCell>
                           <Chip
+                            icon={
+                              s.status === 'ACTIVE'
+                                ? <CheckCircle className="w-3.5 h-3.5" />
+                                : s.status === 'SUBMITTED'
+                                ? <CheckCircle2 className="w-3.5 h-3.5" />
+                                : <AlertTriangle className="w-3.5 h-3.5" />
+                            }
                             label={
                               s.status === 'ACTIVE'
                                 ? 'ปกติ (ในจอ)'
                                 : s.status === 'LEFT_FULLSCREEN'
-                                ? '🚨 หลุด Fullscreen'
+                                ? 'หลุด Fullscreen'
                                 : s.status === 'TAB_SWITCH' || s.status === 'BLUR'
-                                ? '⚠️ สลับแท็บ / ยุบจอ'
+                                ? 'สลับแท็บ / ยุบจอ'
                                 : s.status === 'SUBMITTED'
                                 ? 'ส่งข้อสอบแล้ว'
                                 : s.status
@@ -738,6 +747,125 @@ export default function TeacherDashboard({
             </Table>
           </TableContainer>
 
+          {/* MOBILE / TABLET VIEW: Card-Based Student Cards */}
+          <Box sx={{ display: { xs: 'block', md: 'none' }, p: 2, overflowY: 'auto', flex: 1, maxHeight: 520 }}>
+            {loading && students.length === 0 ? (
+              [...Array(4)].map((_, idx) => (
+                <Paper key={idx} variant="outlined" sx={{ p: 2, mb: 1.5, borderRadius: 2.5 }}>
+                  <Skeleton variant="text" width="60%" height={24} />
+                  <Skeleton variant="text" width="40%" height={18} />
+                </Paper>
+              ))
+            ) : filteredStudents.length === 0 ? (
+              <Box sx={{ textAlign: 'center', py: 6, color: 'text.secondary' }}>
+                <Users className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  ยังไม่มีนักศึกษาเข้าห้องสอบนี้
+                </Typography>
+              </Box>
+            ) : (
+              <Stack spacing={1.5}>
+                {filteredStudents.map((s) => {
+                  const isViolation = s.violations > 0;
+                  return (
+                    <Paper
+                      key={s.studentId}
+                      variant="outlined"
+                      sx={{
+                        p: 2,
+                        borderRadius: 3,
+                        backgroundColor: isViolation ? '#fff5f5' : '#ffffff',
+                        borderColor: isViolation ? '#fecaca' : '#e2e8f0',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1.5 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                          <Avatar sx={{ width: 34, height: 34, fontSize: '0.85rem', fontWeight: 800, backgroundColor: '#dbeafe', color: '#1d4ed8' }}>
+                            {s.studentName ? s.studentName.charAt(0) : 'S'}
+                          </Avatar>
+                          <Box>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                              {s.studentName}
+                            </Typography>
+                            <Typography variant="caption" sx={{ fontFamily: 'monospace', fontWeight: 700, color: 'text.secondary' }}>
+                              รหัส: {s.studentId}
+                            </Typography>
+                          </Box>
+                        </Box>
+
+                        <Chip
+                          icon={
+                            s.status === 'ACTIVE'
+                              ? <CheckCircle className="w-3 h-3" />
+                              : s.status === 'SUBMITTED'
+                              ? <CheckCircle2 className="w-3 h-3" />
+                              : <AlertTriangle className="w-3 h-3" />
+                          }
+                          label={
+                            s.status === 'ACTIVE'
+                              ? 'ปกติ (ในจอ)'
+                              : s.status === 'LEFT_FULLSCREEN'
+                              ? 'หลุด Fullscreen'
+                              : s.status === 'TAB_SWITCH' || s.status === 'BLUR'
+                              ? 'สลับแท็บ / ยุบจอ'
+                              : s.status === 'SUBMITTED'
+                              ? 'ส่งแล้ว'
+                              : s.status
+                          }
+                          size="small"
+                          color={
+                            s.status === 'ACTIVE'
+                              ? 'success'
+                              : s.status === 'SUBMITTED'
+                              ? 'primary'
+                              : 'error'
+                          }
+                          sx={{ fontWeight: 700, fontSize: '0.7rem' }}
+                        />
+                      </Box>
+
+                      <Divider sx={{ my: 1, borderColor: '#f1f5f9' }} />
+
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: 'text.secondary' }}>
+                        <Box>
+                          <span>หลุดจอ: </span>
+                          {s.violations > 0 ? (
+                            <Chip
+                              label={`${s.violations} ครั้ง`}
+                              size="small"
+                              color="error"
+                              sx={{ height: 20, fontSize: '0.68rem', fontWeight: 800, ml: 0.5 }}
+                            />
+                          ) : (
+                            <span className="font-semibold text-emerald-600 ml-0.5">0 ครั้ง</span>
+                          )}
+                        </Box>
+                        <Box sx={{ fontFamily: 'monospace', fontSize: '0.72rem' }}>
+                          เข้า: {s.joinedAt ? (s.joinedAt.split(' ')[1] || s.joinedAt) : '-'}
+                        </Box>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', gap: 1, mt: 1.5, pt: 1, borderTop: '1px dashed #e2e8f0' }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="inherit"
+                          fullWidth
+                          onClick={(e) => handleOpenStudentMenu(e, s)}
+                          startIcon={<MoreHorizontal className="w-3.5 h-3.5" />}
+                          sx={{ fontSize: '0.75rem', fontWeight: 700, borderRadius: 2 }}
+                        >
+                          จัดการผู้สอบ
+                        </Button>
+                      </Box>
+                    </Paper>
+                  );
+                })}
+              </Stack>
+            )}
+          </Box>
+
           {/* Integrated Card Footer - pinned cleanly at the bottom */}
           <Box
             sx={{
@@ -761,132 +889,8 @@ export default function TeacherDashboard({
           </Box>
         </Paper>
 
-        {/* Right: Live Audit Feed with Timeline (Matching Image 1) */}
-        <Paper
-          elevation={1}
-          sx={{
-            p: 2.5,
-            borderRadius: 3.5,
-            border: '1px solid #e2e8f0',
-            display: 'flex',
-            flexDirection: 'column',
-            height: { xs: 'auto', md: 620 },
-            minHeight: { md: 620 },
-            backgroundColor: '#ffffff',
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 2, borderBottom: '1px solid #e2e8f0' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <ShieldAlert className="w-5 h-5 text-brand-600" />
-              <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                เหตุการณ์สด (Live Audit Feed)
-              </Typography>
-            </Box>
-            <Chip label={`${logs.length} logs`} size="small" sx={{ fontFamily: 'monospace', fontSize: '0.7rem' }} />
-          </Box>
-
-          <Box sx={{ flex: 1, overflowY: 'auto', pt: 2, pr: 0.5 }}>
-            <Box sx={{ position: 'relative', pl: 3.5 }}>
-              {/* Vertical timeline connecting line */}
-              <Box
-                sx={{
-                  position: 'absolute',
-                  left: 10,
-                  top: 8,
-                  bottom: 8,
-                  width: 2,
-                  backgroundColor: '#e2e8f0',
-                }}
-              />
-
-              <Stack spacing={2}>
-                {loading && logs.length === 0 ? (
-                  [...Array(6)].map((_, idx) => (
-                    <Box key={`skeleton-log-${idx}`} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 0.5 }}>
-                      <Skeleton variant="circular" width={10} height={10} />
-                      <Box sx={{ flex: 1 }}>
-                        <Skeleton variant="text" width="65%" height={22} sx={{ borderRadius: 1 }} />
-                        <Skeleton variant="text" width="40%" height={16} sx={{ borderRadius: 1 }} />
-                      </Box>
-                    </Box>
-                  ))
-                ) : logs.length === 0 ? (
-                  <Typography variant="caption" sx={{ textAlign: 'center', color: 'text.secondary', display: 'block', py: 8 }}>
-                    ยังไม่มีประวัติการหลุดจอหรือส่งข้อสอบ
-                  </Typography>
-                ) : (
-                  logs.map((log, index) => {
-                    const isAlert =
-                      log.eventType === 'LEFT_FULLSCREEN' ||
-                      log.eventType === 'TAB_SWITCH' ||
-                      log.eventType === 'BLUR' ||
-                      log.eventType === 'EXIT_PIN_FAILED';
-
-                    return (
-                      <Box key={index} sx={{ position: 'relative' }}>
-                        {/* Dot on timeline */}
-                        <Box
-                          sx={{
-                            position: 'absolute',
-                            left: -22,
-                            top: 14,
-                            width: 10,
-                            height: 10,
-                            borderRadius: '50%',
-                            backgroundColor: isAlert ? '#dc2626' : log.eventType === 'SUBMITTED' ? '#2563eb' : '#10b981',
-                            border: '2px solid #ffffff',
-                            boxShadow: '0 0 0 2px rgba(0,0,0,0.05)',
-                          }}
-                        />
-
-                        {/* Event Card */}
-                        <Paper
-                          variant="outlined"
-                          sx={{
-                            p: 1.5,
-                            borderRadius: 2.5,
-                            backgroundColor: isAlert ? '#fef2f2' : log.eventType === 'SUBMITTED' ? '#eff6ff' : '#f8fafc',
-                            borderColor: isAlert ? '#fecaca' : log.eventType === 'SUBMITTED' ? '#bfdbfe' : '#e2e8f0',
-                          }}
-                        >
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                            <Typography variant="caption" sx={{ fontFamily: 'monospace', fontWeight: 800, color: 'text.primary' }}>
-                              {log.studentId}
-                            </Typography>
-                            <Typography variant="caption" sx={{ fontSize: '0.68rem', color: 'text.secondary' }}>
-                              {log.timestamp}
-                            </Typography>
-                          </Box>
-                          <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '0.8rem' }}>
-                            {log.studentName}
-                          </Typography>
-                          <Chip
-                            label={
-                              log.eventType === 'LEFT_FULLSCREEN'
-                                ? '🚨 หลุด Fullscreen'
-                                : log.eventType === 'TAB_SWITCH'
-                                ? '⚠️ สลับแท็บ / ยุบจอ'
-                                : log.eventType === 'BLUR'
-                                ? '⚠️ หลุดโฟกัสหน้าต่างสอบ'
-                                : log.eventType === 'SUBMITTED'
-                                ? '✅ ส่งข้อสอบสำเร็จ'
-                                : log.eventType === 'STUDENT_JOINED'
-                                ? '👤 เข้าร่วมห้องสอบ'
-                                : log.eventType
-                            }
-                            size="small"
-                            color={isAlert ? 'error' : log.eventType === 'SUBMITTED' ? 'primary' : 'default'}
-                            sx={{ mt: 0.5, height: 20, fontSize: '0.68rem', fontWeight: 700 }}
-                          />
-                        </Paper>
-                      </Box>
-                    );
-                  })
-                )}
-              </Stack>
-            </Box>
-          </Box>
-        </Paper>
+        {/* Right: Live Audit Feed with Timeline */}
+        <LiveAuditTimeline logs={logs} loading={loading} />
       </Box>
 
       {/* Student Action Menu */}

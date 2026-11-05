@@ -24,10 +24,11 @@ import {
   Settings,
   ExternalLink,
   Sliders,
+  Menu as MenuIcon,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-export default function AdminTopbar({ title = 'แดชบอร์ดคุมสอบ', onOpenSettings }) {
+export default function AdminTopbar({ title = 'แดชบอร์ดคุมสอบ', onOpenSettings, onToggleMobileSidebar }) {
   const { user, logout } = useAuth();
   const [anchorEl, setAnchorEl] = useState(null);
 
@@ -43,7 +44,7 @@ export default function AdminTopbar({ title = 'แดชบอร์ดคุม
     <Box
       sx={{
         height: 64,
-        px: 3.5,
+        px: { xs: 2, sm: 3.5 },
         backgroundColor: '#ffffff',
         borderBottom: '1px solid #e2e8f0',
         display: 'flex',
@@ -54,10 +55,18 @@ export default function AdminTopbar({ title = 'แดชบอร์ดคุม
         zIndex: 20,
       }}
     >
-      {/* Left: Breadcrumbs / Title */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <Home className="w-4 h-4 text-slate-500" />
-        <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'text.primary', fontSize: '0.95rem' }}>
+      {/* Left: Mobile Menu Button + Breadcrumbs / Title */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <IconButton
+          size="small"
+          onClick={onToggleMobileSidebar}
+          sx={{ display: { xs: 'inline-flex', md: 'none' }, border: '1px solid #e2e8f0', p: 0.8 }}
+          aria-label="open drawer"
+        >
+          <MenuIcon className="w-5 h-5 text-slate-700" />
+        </IconButton>
+        <Home className="w-4 h-4 text-slate-500" sx={{ display: { xs: 'none', sm: 'block' } }} />
+        <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'text.primary', fontSize: { xs: '0.88rem', sm: '0.95rem' } }}>
           {title}
         </Typography>
       </Box>
@@ -74,7 +83,7 @@ export default function AdminTopbar({ title = 'แดชบอร์ดคุม
         {/* Help */}
         <IconButton
           size="small"
-          onClick={() => window.open('https://docs.google.com/spreadsheets/d/1ymUruyobCQTdvyJ6X1uhoU5Zys9wulF4bciYvD1PRH4/edit', '_blank')}
+          onClick={onOpenSettings}
           sx={{ border: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}
         >
           <HelpCircle className="w-4 h-4 text-slate-600" />
@@ -145,7 +154,7 @@ export default function AdminTopbar({ title = 'แดชบอร์ดคุม
                 <ListItemIcon>
                   <Settings className="w-4 h-4" />
                 </ListItemIcon>
-                <ListItemText primary="ตั้งค่าระบบ / Google Sheet" />
+                <ListItemText primary="ตั้งค่าระบบ / การเชื่อมต่อ API" />
               </MenuItem>
               <Divider />
               <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>

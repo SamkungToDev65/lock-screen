@@ -1,74 +1,52 @@
 /**
- * Service to handle data persistence:
- * Connected directly to SAMMLocker MariaDB/PHP REST API (dashboard.bcnlp.ac.th)
- * with backward-compatible Google Apps Script (GAS) Web App fallback.
+ * SAMMLocker High-Performance REST API Service
+ * Connected directly to MariaDB / PHP Backend (dashboard.bcnlp.ac.th)
+ * with LocalStorage resilience and in-memory request deduplication.
  */
 
-const GAS_URL_KEY = 'secure_exam_gas_url';
+const API_URL_KEY = 'secure_exam_api_url';
 const LOCAL_ROOMS_KEY = 'secure_exam_rooms';
 const LOCAL_STUDENTS_KEY = 'secure_exam_students';
 const LOCAL_LOGS_KEY = 'secure_exam_logs';
 
 export const DEFAULT_API_URL = 'https://dashboard.bcnlp.ac.th/api/SammLocker/index.php';
-const LEGACY_DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwSASTBGD_mcK796wybE6DOQqkdojhfPf7Yes8BZJGMJrqguPNE-900uacOzHKmpbP6/exec';
 
-export const isGasUrl = (url) => {
-  return Boolean(url && url.includes('script.google.com'));
-};
-
-export const normalizeGasUrl = (url) => {
+export const normalizeApiUrl = (url) => {
   let trimmed = (url || '').trim();
   if (!trimmed) return DEFAULT_API_URL;
 
-  // If user pasted just deployment ID (starts with AKfycb...)
-  if (trimmed.startsWith('AKfycb') && !trimmed.includes('/')) {
-    trimmed = `https://script.google.com/macros/s/${trimmed}/exec`;
+  trimmed = trimmed.replace(/\.{2,}$/, '').replace(/\/+$/, '');
+  if (!trimmed.endsWith('.php')) {
+    trimmed = `${trimmed}/index.php`;
   }
-
-  // Remove trailing ellipsis if inadvertently copied with ...
-  trimmed = trimmed.replace(/\.{2,}$/, '');
-
-  // Strip /dev or /echo and ensure /exec for Google Apps Script
-  if (trimmed.includes('script.google.com')) {
-    trimmed = trimmed.replace(/\/dev(\?.*)?$/, '/exec');
-    trimmed = trimmed.replace(/\/echo(\?.*)?$/, '/exec');
-    if (!trimmed.endsWith('/exec')) {
-      trimmed = trimmed.replace(/\/+$/, '') + '/exec';
-    }
-  } else {
-    // For standard PHP/REST endpoints, ensure it targets index.php to avoid Apache 301 directory redirects
-    trimmed = trimmed.replace(/\/+$/, '');
-    if (!trimmed.endsWith('.php')) {
-      trimmed = `${trimmed}/index.php`;
-    }
-  }
-
   return trimmed;
 };
 
-export const getGasUrl = () => {
-  const stored = localStorage.getItem(GAS_URL_KEY);
-  if (
-    !stored ||
-    stored === LEGACY_DEFAULT_GAS_URL ||
-    stored === 'https://dashboard.bcnlp.ac.th/api/SammLocker' ||
-    stored === 'https://dashboard.bcnlp.ac.th/api/SammLocker/'
-  ) {
-    localStorage.setItem(GAS_URL_KEY, DEFAULT_API_URL);
+// Aliased for backward compatibility
+export const normalizeGasUrl = normalizeApiUrl;
+
+export const getApiUrl = () => {
+  const stored = localStorage.getItem(API_URL_KEY) || localStorage.getItem('secure_exam_gas_url');
+  if (!stored || stored.includes('script.google.com') || stored === 'https://dashboard.bcnlp.ac.th/api/SammLocker' || stored === 'https://dashboard.bcnlp.ac.th/api/SammLocker/') {
+    localStorage.setItem(API_URL_KEY, DEFAULT_API_URL);
     return DEFAULT_API_URL;
   }
-
-  const normalized = normalizeGasUrl(stored);
-  if (normalized !== stored) localStorage.setItem(GAS_URL_KEY, normalized);
+  const normalized = normalizeApiUrl(stored);
+  if (normalized !== stored) localStorage.setItem(API_URL_KEY, normalized);
   return normalized;
 };
 
-export const setGasUrl = (url) => {
-  const norm = normalizeGasUrl(url);
-  localStorage.setItem(GAS_URL_KEY, norm);
+export const setApiUrl = (url) => {
+  const norm = normalizeApiUrl(url);
+  localStorage.setItem(API_URL_KEY, norm);
+  localStorage.setItem('secure_exam_gas_url', norm);
 };
 
-// In-memory cache & In-flight request deduplication for high concurrency
+// Aliased for existing component imports
+export const getGasUrl = getApiUrl;
+export const setGasUrl = setApiUrl;
+
+// In-memory cache & In-flight request deduplication
 const inFlightRequests = new Map();
 const memoryCache = new Map();
 
@@ -94,76 +72,42 @@ export const invalidateCache = (prefix) => {
   }
 };
 
-// Safe JSONP Client with Request Deduplication for Google Apps Script
-const fetchJsonp = (baseUrl, params = {}, timeout = 20000) => {
-  const queryString = new URLSearchParams(params).toString();
-  const dedupKey = `${baseUrl}?${queryString}`;
+/**
+ * Universal API GET request with deduplication
+ */
+const apiGet = async (params = {}) => {
+  const apiUrl = getApiUrl();
+  const query = new URLSearchParams(params).toString();
+  const fullUrl = `${apiUrl}?${query}`;
 
-  if (inFlightRequests.has(dedupKey)) {
-    return inFlightRequests.get(dedupKey);
+  if (inFlightRequests.has(fullUrl)) {
+    return inFlightRequests.get(fullUrl);
   }
 
-  const promise = new Promise((resolve) => {
-    const callbackName = 'gas_cb_' + Math.random().toString(36).substring(2, 9);
-    const script = document.createElement('script');
-    let timer = null;
-
-    const cleanup = () => {
-      if (timer) clearTimeout(timer);
-      delete window[callbackName];
-      if (script.parentNode) script.parentNode.removeChild(script);
-      inFlightRequests.delete(dedupKey);
-    };
-
-    window[callbackName] = (data) => {
-      cleanup();
-      resolve(data || { success: true });
-    };
-
-    timer = setTimeout(() => {
-      cleanup();
-      resolve({ success: false, error: 'TIMEOUT' });
-    }, timeout);
-
-    script.onerror = () => {
-      cleanup();
-      resolve({ success: false, error: 'SCRIPT_ERROR' });
-    };
-
+  const promise = (async () => {
     try {
-      const fullQuery = new URLSearchParams({ ...params, callback: callbackName }).toString();
-      script.src = `${baseUrl}?${fullQuery}`;
-      document.body.appendChild(script);
-    } catch (e) {
-      cleanup();
-      resolve({ success: false, error: e.message });
+      const res = await fetch(fullUrl, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+      });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+      return await res.json();
+    } finally {
+      inFlightRequests.delete(fullUrl);
     }
-  });
+  })();
 
-  inFlightRequests.set(dedupKey, promise);
+  inFlightRequests.set(fullUrl, promise);
   return promise;
 };
 
-// Safe background write: Supports PHP REST API & Google Apps Script
-const sendApiPost = async (data) => {
-  const apiUrl = getGasUrl();
-  if (!apiUrl) return;
-
-  if (isGasUrl(apiUrl)) {
-    // Google Apps Script keepalive no-cors
-    try {
-      fetch(apiUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        keepalive: true,
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(data),
-      }).catch(() => {});
-    } catch (e) {}
-    return;
-  }
-
-  // High-speed PHP REST Backend
+/**
+ * Universal API POST request
+ */
+const apiPost = async (payload = {}) => {
+  const apiUrl = getApiUrl();
   try {
     const res = await fetch(apiUrl, {
       method: 'POST',
@@ -172,17 +116,16 @@ const sendApiPost = async (data) => {
         'Accept': 'application/json',
       },
       keepalive: true,
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch (e) {
-    console.warn('API POST warn (will rely on local optimistic cache):', e);
+    return await res.json();
+  } catch (err) {
+    console.warn('API POST error:', err);
+    return { success: false, error: err.message };
   }
 };
 
-// Initial local store: Pure empty state (NO mock data)
+// Initial local store
 const initLocalStore = () => {
   if (!localStorage.getItem(LOCAL_ROOMS_KEY)) {
     localStorage.setItem(LOCAL_ROOMS_KEY, JSON.stringify([]));
@@ -194,124 +137,73 @@ const initLocalStore = () => {
     localStorage.setItem(LOCAL_LOGS_KEY, JSON.stringify([]));
   }
 };
-
 initLocalStore();
 
-export const testGasConnection = async (urlToTest) => {
-  const target = normalizeGasUrl(urlToTest || getGasUrl());
-  if (!target) {
-    throw new Error('กรุณาระบุ URL ของ SAMMLocker API หรือ Google Apps Script');
-  }
-
-  let data;
-  if (isGasUrl(target)) {
-    data = await fetchJsonp(target, { action: 'ping' });
-  } else {
-    try {
-      const res = await fetch(`${target}?action=ping`, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
-      });
-      data = await res.json();
-    } catch (e) {
-      throw new Error(`ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ API ได้ (${e.message}): กรุณาตรวจสอบว่าได้อัปโหลดไฟล์ไปยัง ${target} แล้ว`);
+/**
+ * Test Connection
+ */
+export const testApiConnection = async (urlToTest) => {
+  const target = normalizeApiUrl(urlToTest || getApiUrl());
+  try {
+    const res = await fetch(`${target}?action=ping`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+    });
+    const data = await res.json();
+    if (data && data.success) {
+      return data;
     }
+    throw new Error(data?.error || 'เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง');
+  } catch (err) {
+    throw new Error(`ไม่สามารถเชื่อมต่อ API ได้ (${err.message}): กรุณาตรวจสอบ URL หรือสถานะเซิร์ฟเวอร์`);
   }
-
-  if (data && data.success) {
-    return data;
-  }
-
-  const reason = data?.error;
-  if (reason === 'TIMEOUT') {
-    throw new Error('เชื่อมต่อไม่ทันเวลา (Timeout): กรุณาตรวจสอบสถานะเซิร์ฟเวอร์');
-  }
-  if (reason === 'SCRIPT_ERROR') {
-    throw new Error('เปิด Web App ไม่สำเร็จ: ตรวจสอบสิทธิ์ Anyone และ Executions');
-  }
-  throw new Error(reason || 'API ตอบกลับไม่ถูกต้อง: กรุณาตรวจสอบ URL');
 };
 
-/**
- * Admin Login: validates against MariaDB `admins` table or Google Sheets
- */
-export const adminLoginSheet = async (username, password) => {
-  const apiUrl = getGasUrl();
-  if (!apiUrl) {
-    return { success: false, error: 'ยังไม่ได้ระบุ API URL สำหรับเชื่อมต่อระบบ' };
-  }
+// Alias for existing component imports
+export const testGasConnection = testApiConnection;
 
+/**
+ * Admin Login
+ */
+export const adminLogin = async (username, password) => {
   try {
-    let data;
-    if (isGasUrl(apiUrl)) {
-      data = await fetchJsonp(apiUrl, {
-        action: 'adminLogin',
-        username: username.trim(),
-        password: password,
-      });
-    } else {
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'adminLogin',
-          username: username.trim(),
-          password: password,
-        }),
-      });
-      data = await res.json();
-    }
+    const data = await apiPost({
+      action: 'adminLogin',
+      username: username.trim(),
+      password: password,
+    });
 
     if (data && data.success && data.user) {
       return data;
     }
-    if (data && data.error && data.error !== 'SCRIPT_ERROR' && data.error !== 'TIMEOUT') {
-      return data;
-    }
-    if (data && (data.error === 'SCRIPT_ERROR' || data.error === 'TIMEOUT')) {
-      return {
-        success: false,
-        error: data.error === 'TIMEOUT'
-          ? 'หมดเวลารอเซิร์ฟเวอร์: ตรวจสอบสถานะเครือข่ายและการเชื่อมต่อเซิร์ฟเวอร์'
-          : 'เบราว์เซอร์ไม่สามารถติดต่อ API ได้: ตรวจสอบ URL และการเชื่อมต่ออินเทอร์เน็ต',
-      };
-    }
-  } catch (e) {
-    return { success: false, error: e.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ' };
+    return {
+      success: false,
+      error: data?.error || 'อีเมลหรือรหัสผ่านไม่ถูกต้อง (ตรวจสอบในตาราง admins)',
+    };
+  } catch (err) {
+    return { success: false, error: err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์' };
   }
-
-  return { success: false, error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง (ตรวจสอบในตาราง admins)' };
 };
 
+// Alias for existing component imports
+export const adminLoginSheet = adminLogin;
+
 /**
- * List all rooms from MariaDB / Google Sheet
+ * List all rooms
  */
 export const listRooms = async () => {
   const cached = getCache('rooms_list');
   if (cached) return { success: true, rooms: cached };
 
-  const apiUrl = getGasUrl();
-  if (apiUrl) {
-    try {
-      let data;
-      if (isGasUrl(apiUrl)) {
-        data = await fetchJsonp(apiUrl, { action: 'listRooms' });
-      } else {
-        const res = await fetch(`${apiUrl}?action=listRooms`, {
-          headers: { 'Accept': 'application/json' },
-        });
-        data = await res.json();
-      }
-
-      if (data && data.success && Array.isArray(data.rooms)) {
-        setCache('rooms_list', data.rooms, 15000);
-        localStorage.setItem(LOCAL_ROOMS_KEY, JSON.stringify(data.rooms));
-        return { success: true, rooms: data.rooms };
-      }
-    } catch (e) {}
+  try {
+    const data = await apiGet({ action: 'listRooms' });
+    if (data && data.success && Array.isArray(data.rooms)) {
+      setCache('rooms_list', data.rooms, 10000);
+      localStorage.setItem(LOCAL_ROOMS_KEY, JSON.stringify(data.rooms));
+      return { success: true, rooms: data.rooms };
+    }
+  } catch (err) {
+    console.warn('listRooms network fallback to local:', err);
   }
 
   const rooms = JSON.parse(localStorage.getItem(LOCAL_ROOMS_KEY) || '[]');
@@ -333,11 +225,10 @@ export const createRoom = async ({ roomCode, title, examUrl, exitPin, maxViolati
     createdAt: new Date().toLocaleString('th-TH'),
   };
 
-  // Invalidate cache
   invalidateCache('rooms_list');
   invalidateCache('room_' + normalizedCode);
 
-  // 1. Save locally
+  // 1. Optimistic local save
   const rooms = JSON.parse(localStorage.getItem(LOCAL_ROOMS_KEY) || '[]');
   const existingIdx = rooms.findIndex((r) => r.roomCode.toUpperCase() === normalizedCode);
   if (existingIdx >= 0) {
@@ -347,8 +238,8 @@ export const createRoom = async ({ roomCode, title, examUrl, exitPin, maxViolati
   }
   localStorage.setItem(LOCAL_ROOMS_KEY, JSON.stringify(rooms));
 
-  // 2. Safe background sync to Backend
-  sendApiPost({
+  // 2. Server Sync
+  apiPost({
     action: 'createRoom',
     ...roomObj,
   });
@@ -366,24 +257,14 @@ export const getRoom = async (roomCode) => {
   const cached = getCache('room_' + normalized);
   if (cached) return { success: true, room: cached };
 
-  const apiUrl = getGasUrl();
-  if (apiUrl) {
-    try {
-      let data;
-      if (isGasUrl(apiUrl)) {
-        data = await fetchJsonp(apiUrl, { action: 'getRoom', roomCode: normalized });
-      } else {
-        const res = await fetch(`${apiUrl}?action=getRoom&roomCode=${encodeURIComponent(normalized)}`, {
-          headers: { 'Accept': 'application/json' },
-        });
-        data = await res.json();
-      }
-
-      if (data && data.success && data.room) {
-        setCache('room_' + normalized, data.room, 30000);
-        return data;
-      }
-    } catch (e) {}
+  try {
+    const data = await apiGet({ action: 'getRoom', roomCode: normalized });
+    if (data && data.success && data.room) {
+      setCache('room_' + normalized, data.room, 20000);
+      return data;
+    }
+  } catch (err) {
+    console.warn('getRoom network fallback to local:', err);
   }
 
   const rooms = JSON.parse(localStorage.getItem(LOCAL_ROOMS_KEY) || '[]');
@@ -396,7 +277,7 @@ export const getRoom = async (roomCode) => {
 };
 
 /**
- * Update an existing room
+ * Update room
  */
 export const updateRoom = async (roomCode, updatedFields) => {
   const normalized = roomCode.toUpperCase().trim();
@@ -405,13 +286,12 @@ export const updateRoom = async (roomCode, updatedFields) => {
 
   const rooms = JSON.parse(localStorage.getItem(LOCAL_ROOMS_KEY) || '[]');
   const idx = rooms.findIndex((r) => r.roomCode.toUpperCase() === normalized);
-
   if (idx >= 0) {
     rooms[idx] = { ...rooms[idx], ...updatedFields };
     localStorage.setItem(LOCAL_ROOMS_KEY, JSON.stringify(rooms));
   }
 
-  sendApiPost({
+  apiPost({
     action: 'updateRoom',
     roomCode: normalized,
     ...updatedFields,
@@ -421,7 +301,7 @@ export const updateRoom = async (roomCode, updatedFields) => {
 };
 
 /**
- * Delete a room
+ * Delete room
  */
 export const deleteRoom = async (roomCode) => {
   const normalized = roomCode.toUpperCase().trim();
@@ -432,7 +312,7 @@ export const deleteRoom = async (roomCode) => {
   const filtered = rooms.filter((r) => r.roomCode.toUpperCase() !== normalized);
   localStorage.setItem(LOCAL_ROOMS_KEY, JSON.stringify(filtered));
 
-  sendApiPost({
+  apiPost({
     action: 'deleteRoom',
     roomCode: normalized,
   });
@@ -472,7 +352,7 @@ export const joinRoom = async (roomCode, studentId, studentName) => {
   localStorage.setItem(LOCAL_STUDENTS_KEY, JSON.stringify(students));
   logAuditLocal(normalized, studentId, studentName, 'STUDENT_JOINED', 'เข้าสู่ห้องสอบ');
 
-  sendApiPost({
+  apiPost({
     action: 'joinRoom',
     roomCode: normalized,
     studentId,
@@ -482,15 +362,22 @@ export const joinRoom = async (roomCode, studentId, studentName) => {
   return { success: true, student };
 };
 
-// Throttle tracking for student violations to protect backend from client burst
+// Throttle tracking for student violations
 const lastViolationSent = new Map();
 const violationTimers = new Map();
+
+export const getLocalMysqlTimestamp = () => {
+  const d = new Date();
+  const pad = (n) => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
 
 /**
  * Log violation with client-side burst throttling & local optimistic update
  */
 export const logViolation = async (roomCode, studentId, studentName, eventType, details) => {
   const normalized = roomCode.toUpperCase();
+  const mysqlTime = getLocalMysqlTimestamp();
   const now = new Date().toLocaleString('th-TH');
 
   const students = JSON.parse(localStorage.getItem(LOCAL_STUDENTS_KEY) || '[]');
@@ -509,38 +396,38 @@ export const logViolation = async (roomCode, studentId, studentName, eventType, 
 
   logAuditLocal(normalized, studentId, studentName, eventType, details || 'พบการละเมิดกฎการสอบ');
 
-  // Throttle network writes to at most 1 per 2.5 seconds per student
   const throttleKey = `${normalized}_${studentId}`;
   const lastTime = lastViolationSent.get(throttleKey) || 0;
   const nowMs = Date.now();
 
-  if (nowMs - lastTime > 2500) {
+  if (nowMs - lastTime > 2000) {
     lastViolationSent.set(throttleKey, nowMs);
-    sendApiPost({
+    apiPost({
       action: 'logViolation',
       roomCode: normalized,
       studentId,
       studentName,
       eventType,
       details,
+      clientTimestamp: mysqlTime,
     });
   } else {
-    // Debounce delayed batch send
     if (violationTimers.has(throttleKey)) {
       clearTimeout(violationTimers.get(throttleKey));
     }
     const timer = setTimeout(() => {
       lastViolationSent.set(throttleKey, Date.now());
       violationTimers.delete(throttleKey);
-      sendApiPost({
+      apiPost({
         action: 'logViolation',
         roomCode: normalized,
         studentId,
         studentName,
         eventType,
         details: `${details} (สะสม ${violations} ครั้ง)`,
+        clientTimestamp: getLocalMysqlTimestamp(),
       });
-    }, 2600);
+    }, 2100);
     violationTimers.set(throttleKey, timer);
   }
 
@@ -594,7 +481,7 @@ export const submitExam = async (roomCode, studentId, studentName, pin) => {
 
   logAuditLocal(normalized, studentId, studentName, 'SUBMITTED', 'ส่งข้อสอบสำเร็จและปลดล็อกหน้าจอ');
 
-  sendApiPost({
+  apiPost({
     action: 'submitExam',
     roomCode: normalized,
     studentId,
@@ -623,7 +510,7 @@ export const resetStudentViolations = async (roomCode, studentId) => {
     logAuditLocal(normalized, studentId, student.studentName, 'RESET_WARNING', 'อาจารย์ผู้คุมสอบรีเซ็ตสถานะและล้างการเตือน');
   }
 
-  sendApiPost({
+  apiPost({
     action: 'resetStudent',
     roomCode: normalized,
     studentId,
@@ -649,7 +536,7 @@ export const forceSubmitStudent = async (roomCode, studentId) => {
     logAuditLocal(normalized, studentId, student.studentName, 'FORCE_SUBMITTED', 'อาจารย์ผู้คุมสอบสั่งส่งข้อสอบแทน (Teacher Override)');
   }
 
-  sendApiPost({
+  apiPost({
     action: 'forceSubmit',
     roomCode: normalized,
     studentId,
@@ -659,8 +546,7 @@ export const forceSubmitStudent = async (roomCode, studentId) => {
 };
 
 /**
- * Fetch real-time dashboard data directly from Backend (MariaDB / Sheets)
- * Protected with memory cache to prevent duplicate requests across components
+ * Fetch real-time dashboard data from MariaDB Backend
  */
 export const getDashboardData = async (roomCode, bypassCache = false) => {
   const normalized = roomCode ? roomCode.toUpperCase().trim() : '';
@@ -671,38 +557,28 @@ export const getDashboardData = async (roomCode, bypassCache = false) => {
     if (cached) return cached;
   }
 
-  const apiUrl = getGasUrl();
-  if (apiUrl) {
-    try {
-      let data;
-      if (isGasUrl(apiUrl)) {
-        data = await fetchJsonp(apiUrl, {
-          action: 'getDashboard',
-          roomCode: normalized,
-        });
-      } else {
-        const res = await fetch(`${apiUrl}?action=getDashboard&roomCode=${encodeURIComponent(normalized)}`, {
-          headers: { 'Accept': 'application/json' },
-        });
-        data = await res.json();
-      }
+  try {
+    const data = await apiGet({
+      action: 'getDashboard',
+      roomCode: normalized,
+    });
 
-      if (data && data.success) {
-        if (data.students) localStorage.setItem(LOCAL_STUDENTS_KEY, JSON.stringify(data.students));
-        if (data.logs) localStorage.setItem(LOCAL_LOGS_KEY, JSON.stringify(data.logs));
+    if (data && data.success) {
+      if (data.students) localStorage.setItem(LOCAL_STUDENTS_KEY, JSON.stringify(data.students));
+      if (data.logs) localStorage.setItem(LOCAL_LOGS_KEY, JSON.stringify(data.logs));
 
-        const result = {
-          success: true,
-          students: data.students || [],
-          logs: data.logs || [],
-          source: isGasUrl(apiUrl) ? 'GOOGLE_SHEET' : 'MARIADB_API',
-        };
+      const result = {
+        success: true,
+        students: data.students || [],
+        logs: data.logs || [],
+        source: 'MARIADB_API',
+      };
 
-        // Cache for 2.5 seconds to protect backend
-        setCache(cacheKey, result, 2500);
-        return result;
-      }
-    } catch (e) {}
+      setCache(cacheKey, result, 2000);
+      return result;
+    }
+  } catch (err) {
+    console.warn('getDashboardData network fallback to local:', err);
   }
 
   const allStudents = JSON.parse(localStorage.getItem(LOCAL_STUDENTS_KEY) || '[]');
@@ -716,19 +592,17 @@ export const getDashboardData = async (roomCode, bypassCache = false) => {
     ? allLogs.filter((l) => l.roomCode.toUpperCase() === normalized)
     : allLogs;
 
-  const localResult = {
+  return {
     success: true,
     students: filteredStudents,
     logs: filteredLogs.slice(-50).reverse(),
     source: 'LOCAL_SYNC',
   };
-
-  return localResult;
 };
 
 export const clearAuditLogs = async (roomCode) => {
   localStorage.setItem(LOCAL_LOGS_KEY, JSON.stringify([]));
-  sendApiPost({
+  apiPost({
     action: 'clearLogs',
     roomCode: roomCode || '',
   });

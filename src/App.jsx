@@ -12,13 +12,14 @@ import SettingsModal from './components/SettingsModal';
 import StudentJoin from './components/Student/StudentJoin';
 import ExamLockScreen from './components/Student/ExamLockScreen';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { Box } from '@mui/material';
+import { Box, Drawer } from '@mui/material';
 
 function AppContent() {
   const { isAuthenticated } = useAuth();
   const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard' | 'login' | 'student-join' | 'exam-active'
   const [adminTab, setAdminTab] = useState('dashboard'); // 'dashboard' | 'rooms' | 'students' | 'exams' | 'reports' | 'settings'
   const [selectedRoomCode, setSelectedRoomCode] = useState('');
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [modalCreateRoom, setModalCreateRoom] = useState(false);
   const [modalQR, setModalQR] = useState(false);
   const [modalProjector, setModalProjector] = useState(false);
@@ -46,11 +47,16 @@ function AppContent() {
     }
 
     if (hash === '#/login') {
-      setCurrentView('login');
+      if (isAuthenticated) {
+        setCurrentView('dashboard');
+        window.location.hash = '#/dashboard';
+      } else {
+        setCurrentView('login');
+      }
       return;
     }
 
-    if (hash === '#/admin' || hash === '#/dashboard') {
+    if (!hash || hash === '#/' || hash === '#/admin' || hash === '#/dashboard') {
       setCurrentView(isAuthenticated ? 'dashboard' : 'login');
       return;
     }
@@ -63,15 +69,24 @@ function AppContent() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, [isAuthenticated]);
 
-  const handleNavigate = (view) => {
-    if ((view === 'dashboard' || view === 'admin') && !isAuthenticated) {
+  // When user successfully authenticates, immediately redirect to dashboard
+  useEffect(() => {
+    if (isAuthenticated && (currentView === 'login' || window.location.hash === '#/login')) {
+      setCurrentView('dashboard');
+      window.location.hash = '#/dashboard';
+    }
+  }, [isAuthenticated, currentView]);
+
+  const handleNavigate = (view, forceAuth = false) => {
+    const isAuth = forceAuth || isAuthenticated;
+    if ((view === 'dashboard' || view === 'admin') && !isAuth) {
       setCurrentView('login');
       window.location.hash = '#/login';
       return;
     }
 
     setCurrentView(view);
-    if (view === 'dashboard') {
+    if (view === 'dashboard' || view === 'admin') {
       window.location.hash = '#/dashboard';
     } else if (view === 'student-join') {
       window.location.hash = selectedRoomCode ? `#/room/${selectedRoomCode}` : '#/student';
@@ -138,19 +153,58 @@ function AppContent() {
   if (isAuthenticated && (currentView === 'dashboard' || currentView === 'admin')) {
     return (
       <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc' }}>
-        {/* Left Sidebar */}
-        <AdminSidebar
-          currentTab={adminTab}
-          onSelectTab={handleSelectAdminTab}
-          onOpenSettings={() => setModalSettings(true)}
-        />
+        {/* Desktop Sidebar (Sticky 100vh full height on md and up) */}
+        <Box
+          sx={{
+            display: { xs: 'none', md: 'block' },
+            position: 'sticky',
+            top: 0,
+            height: '100vh',
+            flexShrink: 0,
+            zIndex: 1000,
+          }}
+        >
+          <AdminSidebar
+            currentTab={adminTab}
+            onSelectTab={handleSelectAdminTab}
+            onOpenSettings={() => setModalSettings(true)}
+          />
+        </Box>
+
+        {/* Mobile / Tablet Drawer Sidebar */}
+        <Drawer
+          anchor="left"
+          open={mobileDrawerOpen}
+          onClose={() => setMobileDrawerOpen(false)}
+          sx={{ display: { xs: 'block', md: 'none' } }}
+          PaperProps={{
+            sx: {
+              border: 'none',
+              background: 'linear-gradient(180deg, #07153b 0%, #0a2052 50%, #061536 100%)',
+              width: 270,
+            },
+          }}
+        >
+          <AdminSidebar
+            currentTab={adminTab}
+            onSelectTab={(tab) => {
+              handleSelectAdminTab(tab);
+              setMobileDrawerOpen(false);
+            }}
+            onOpenSettings={() => {
+              setModalSettings(true);
+              setMobileDrawerOpen(false);
+            }}
+          />
+        </Drawer>
 
         {/* Right Main Body */}
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflowX: 'hidden' }}>
-          {/* Top Bar */}
+          {/* Top Bar with hamburger trigger on mobile */}
           <AdminTopbar
             title={getAdminTabTitle()}
             onOpenSettings={() => setModalSettings(true)}
+            onToggleMobileSidebar={() => setMobileDrawerOpen((prev) => !prev)}
           />
 
           {/* Dynamic Content based on selected sidebar tab */}
@@ -265,7 +319,7 @@ function AppContent() {
         <TeacherLogin
           initialTab={currentView === 'student-join' ? 'student' : 'teacher'}
           initialRoomCode={selectedRoomCode}
-          onLoginSuccess={() => handleNavigate('dashboard')}
+          onLoginSuccess={() => handleNavigate('dashboard', true)}
           onStartExam={handleStartExam}
           onOpenSettings={() => setModalSettings(true)}
         />

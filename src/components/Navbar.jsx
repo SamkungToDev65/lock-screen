@@ -21,7 +21,6 @@ import {
   LayoutDashboard,
   Sliders,
   UserCheck,
-  FileSpreadsheet,
   Settings,
   LogOut,
   Download,
@@ -29,7 +28,6 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { getGasUrl } from '../services/api';
 
 export default function Navbar({
   currentView,
@@ -40,8 +38,6 @@ export default function Navbar({
   const [anchorEl, setAnchorEl] = useState(null);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [canInstallPWA, setCanInstallPWA] = useState(false);
-
-  const hasGasUrl = Boolean(getGasUrl());
 
   useEffect(() => {
     const handler = (e) => {
