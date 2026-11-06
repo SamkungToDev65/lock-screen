@@ -48,7 +48,15 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
     );
   };
 
-  const [isFullscreen, setIsFullscreen] = useState(checkIsFullscreen());
+  // Mobile Safari/iPadOS changes the browser viewport as its toolbar appears
+  // and disappears while scrolling, and does not consistently expose the
+  // Fullscreen API. Treat touch devices as having no enforceable fullscreen.
+  const isTouchDevice = Boolean(
+    navigator.maxTouchPoints > 0 ||
+    window.matchMedia?.('(pointer: coarse)').matches
+  );
+
+  const [isFullscreen, setIsFullscreen] = useState(() => checkIsFullscreen() || isTouchDevice);
   const [violations, setViolations] = useState(student.violations || 0);
   const [warningModalOpen, setWarningModalOpen] = useState(false);
   const [warningReason, setWarningReason] = useState('ออกจากโหมดเต็มจอ หรือสลับหน้าต่าง');
@@ -198,9 +206,9 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
         document.msFullscreenElement
       );
 
-      setIsFullscreen(isNowFs);
+      setIsFullscreen(isNowFs || isTouchDevice);
 
-      if (!isNowFs && !submitted) {
+      if (!isNowFs && !isTouchDevice && !submitted) {
         // Immediate violation trigger on ESC / Fullscreen exit
         handleViolationTrigger('LEFT_FULLSCREEN', 'ออกจากโหมดเต็มจอ (Exited Fullscreen)');
       } else if (isNowFs) {
@@ -223,7 +231,7 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
 
     // 3. Smart Window Blur listener (with iframe activeElement filter)
     const onWindowBlur = () => {
-      if (submitted || exitModalOpen || infoModalOpen) return;
+      if (isTouchDevice || submitted || exitModalOpen || infoModalOpen) return;
 
       setTimeout(() => {
         if (submitted || exitModalOpen || infoModalOpen) return;
@@ -328,7 +336,9 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
     const onResize = () => {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
-        if (submitted) return;
+        // Mobile browser chrome and iPadOS viewport changes can look like a
+        // resize or split screen even when the student only scrolls the page.
+        if (isTouchDevice || submitted) return;
         const screenW = window.screen.availWidth || window.screen.width;
         const screenH = window.screen.availHeight || window.screen.height;
         if (window.innerWidth < screenW * 0.65 || window.innerHeight < screenH * 0.65) {
@@ -380,7 +390,7 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
       document.removeEventListener('paste', onPaste);
       document.removeEventListener('dragstart', onDragStart);
     };
-  }, [submitted, exitModalOpen, infoModalOpen, handleViolationTrigger]);
+  }, [submitted, exitModalOpen, infoModalOpen, handleViolationTrigger, isTouchDevice]);
 
   // Handle Exit PIN verify
   const handleVerifyExitPin = async (e) => {

@@ -4,38 +4,16 @@ import {
   Toolbar,
   Typography,
   Button,
-  IconButton,
-  Avatar,
-  Menu,
-  MenuItem,
-  ListItemIcon,
-  ListItemText,
-  Chip,
-  Tooltip,
   Box,
   Stack,
-  Divider,
 } from '@mui/material';
-import {
-  ShieldCheck,
-  LayoutDashboard,
-  Sliders,
-  UserCheck,
-  Settings,
-  LogOut,
-  Download,
-  Lock,
-  ChevronDown,
-} from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { ShieldCheck, Download } from 'lucide-react';
 
 export default function Navbar({
   currentView,
   onNavigate,
   onOpenSettings,
 }) {
-  const { user, isAuthenticated, logout } = useAuth();
-  const [anchorEl, setAnchorEl] = useState(null);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [canInstallPWA, setCanInstallPWA] = useState(false);
 
@@ -58,15 +36,6 @@ export default function Navbar({
       setCanInstallPWA(false);
     }
     setDeferredPrompt(null);
-  };
-
-  const handleUserMenuOpen = (e) => setAnchorEl(e.currentTarget);
-  const handleUserMenuClose = () => setAnchorEl(null);
-
-  const handleLogout = () => {
-    handleUserMenuClose();
-    logout();
-    onNavigate('login');
   };
 
   // If on login or student-join page, render clean, non-duplicated minimal transparent header
@@ -142,7 +111,7 @@ export default function Navbar({
       <Toolbar sx={{ justifyContent: 'space-between', minHeight: 64, px: { xs: 2, sm: 3 } }}>
         <Box
           sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer' }}
-          onClick={() => onNavigate(isAuthenticated ? 'dashboard' : 'login')}
+          onClick={() => onNavigate('login')}
         >
           <Box
             sx={{
@@ -170,15 +139,18 @@ export default function Navbar({
         </Box>
 
         <Stack direction="row" spacing={1.5} alignItems="center">
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => onNavigate('login')}
-            startIcon={<Lock className="w-4 h-4" />}
-            sx={{ fontWeight: 700, borderRadius: 2 }}
-          >
-            เข้าสู่ระบบอาจารย์ / แอดมิน
-          </Button>
+          {canInstallPWA && (
+            <Button
+              variant="outlined"
+              color="primary"
+              size="small"
+              onClick={handleInstallPWA}
+              startIcon={<Download className="w-4 h-4" />}
+              sx={{ fontWeight: 700, borderRadius: 2 }}
+            >
+              ติดตั้ง PWA
+            </Button>
+          )}
         </Stack>
       </Toolbar>
     </AppBar>
