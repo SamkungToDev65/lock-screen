@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -15,6 +15,11 @@ import {
   InputAdornment,
   CircularProgress,
   Skeleton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
 } from '@mui/material';
 import {
   ShieldAlert,
@@ -26,6 +31,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Sparkles,
+  QrCode,
+  X,
 } from 'lucide-react';
 import { getRoom, joinRoom } from '../../services/api';
 
@@ -41,15 +48,12 @@ export default function StudentJoin({
   const [loading, setLoading] = useState(false);
   const [checkingRoom, setCheckingRoom] = useState(false);
   const [error, setError] = useState('');
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerError, setScannerError] = useState('');
+  const [cameraReady, setCameraReady] = useState(false);
+  const videoRef = useRef(null);
 
-  useEffect(() => {
-    if (initialRoomCode) {
-      setRoomCode(initialRoomCode.toUpperCase());
-      fetchRoom(initialRoomCode);
-    }
-  }, [initialRoomCode]);
-
-  const fetchRoom = async (code) => {
+  const fetchRoom = useCallback(async (code) => {
     if (!code) return;
     setCheckingRoom(true);
     try {
@@ -67,12 +71,131 @@ export default function StudentJoin({
     } finally {
       setCheckingRoom(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (initialRoomCode) {
+      setRoomCode(initialRoomCode.toUpperCase());
+      fetchRoom(initialRoomCode);
+    }
+  }, [initialRoomCode, fetchRoom]);
 
   const handleRoomCodeBlur = () => {
     if (roomCode.trim()) {
       fetchRoom(roomCode.trim());
     }
+  };
+
+  useEffect(() => {
+    if (!scannerOpen) return undefined;
+
+    let active = true;
+    let stream = null;
+    let scanTimer = null;
+
+    const stopStream = () => {
+      if (scanTimer) clearTimeout(scanTimer);
+      if (stream) stream.getTracks().forEach((track) => track.stop());
+      if (videoRef.current) videoRef.current.srcObject = null;
+    };
+
+    const showUnsupportedMessage = () => {
+      const isIOSDevice = /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      setScannerError(isIOSDevice
+        ? 'Safari ยังไม่รองรับการสแกนผ่านเว็บ ให้ใช้แอปกล้องของ iPhone/iPad สแกน QR แล้วแตะลิงก์ ระบบจะกรอกรหัสห้องให้อัตโนมัติ'
+        : 'เบราว์เซอร์นี้ยังไม่รองรับการสแกน QR อัตโนมัติ กรุณาเปิดลิงก์จาก QR หรือกรอกรหัสห้องสอบด้วยตนเอง');
+    };
+
+    const readRoomCode = (value) => {
+      const raw = String(value || '').trim();
+      const routeMatch = raw.match(/(?:#\/room\/|\/room\/)([a-zA-Z0-9_-]+)/i);
+      if (routeMatch) return routeMatch[1].toUpperCase();
+
+      try {
+        const url = new URL(raw);
+        const code = url.searchParams.get('roomCode') || url.searchParams.get('room');
+        if (code) return code.trim().toUpperCase();
+      } catch (_) {
+        // The QR may contain a plain room code rather than a URL.
+      }
+
+      return /^[a-zA-Z0-9_-]{3,20}$/.test(raw) ? raw.toUpperCase() : '';
+    };
+
+    const startScanner = async () => {
+      if (!navigator.mediaDevices?.getUserMedia || typeof window.BarcodeDetector !== 'function') {
+        showUnsupportedMessage();
+        return;
+      }
+
+      try {
+        const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { facingMode: { ideal: 'environment' } },
+        });
+
+        if (!active) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        if (!videoRef.current) return;
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        setCameraReady(true);
+
+        const scanFrame = async () => {
+          if (!active || !videoRef.current) return;
+          try {
+            const [result] = await detector.detect(videoRef.current);
+            if (result?.rawValue) {
+              const code = readRoomCode(result.rawValue);
+              if (code) {
+                setRoomCode(code);
+                setRoomInfo(null);
+                setError('');
+                setScannerOpen(false);
+                fetchRoom(code);
+                return;
+              }
+              setScannerError('QR นี้ไม่มีรหัสห้องสอบ กรุณาสแกน QR ห้องสอบของ SAMMLocker');
+            }
+          } catch (_) {
+            // Continue scanning while the camera adjusts focus or exposure.
+          }
+          if (active) scanTimer = setTimeout(scanFrame, 250);
+        };
+
+        scanFrame();
+      } catch (cameraError) {
+        if (!active) return;
+        if (stream) {
+          stream.getTracks().forEach((track) => track.stop());
+          stream = null;
+        }
+        if (cameraError.name === 'NotAllowedError' || cameraError.name === 'PermissionDeniedError') {
+          setScannerError('กรุณาอนุญาตให้เว็บไซต์ใช้กล้องเพื่อสแกน QR Code');
+        } else if (cameraError.name === 'NotFoundError' || cameraError.name === 'DevicesNotFoundError') {
+          setScannerError('ไม่พบกล้องบนอุปกรณ์นี้');
+        } else {
+          showUnsupportedMessage();
+        }
+      }
+    };
+
+    startScanner();
+    return () => {
+      active = false;
+      stopStream();
+    };
+  }, [scannerOpen, fetchRoom]);
+
+  const openScanner = () => {
+    setScannerError('');
+    setCameraReady(false);
+    setScannerOpen(true);
   };
 
   const handleStartExam = async (e) => {
@@ -210,6 +333,20 @@ export default function StudentJoin({
                   startAdornment: (
                     <InputAdornment position="start">
                       <Hash className="w-4 h-4 text-slate-400" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label="สแกน QR Code ห้องสอบ"
+                        title="สแกน QR Code ห้องสอบ"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={openScanner}
+                        edge="end"
+                        sx={{ color: '#2563eb' }}
+                      >
+                        <QrCode className="w-5 h-5" />
+                      </IconButton>
                     </InputAdornment>
                   ),
                 }}
@@ -359,6 +496,50 @@ export default function StudentJoin({
           </form>
         </CardContent>
       </Card>
+      <Dialog
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        aria-labelledby="room-qr-scanner-title"
+      >
+        <DialogTitle id="room-qr-scanner-title" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 800 }}>
+          สแกน QR Code ห้องสอบ
+          <IconButton aria-label="ปิดหน้าสแกน" onClick={() => setScannerOpen(false)} size="small">
+            <X className="w-4 h-4" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            จัด QR Code ให้อยู่ในกรอบกล้อง ระบบจะกรอกรหัสห้องให้โดยอัตโนมัติ
+          </Typography>
+          {cameraReady && (
+            <Box sx={{ overflow: 'hidden', borderRadius: 2, backgroundColor: '#0f172a' }}>
+              <video
+                ref={videoRef}
+                autoPlay
+                muted
+                playsInline
+                style={{ display: 'block', width: '100%', maxHeight: '55vh', objectFit: 'cover' }}
+              />
+            </Box>
+          )}
+          {!cameraReady && !scannerError && (
+            <Stack spacing={1} alignItems="center" sx={{ py: 4 }}>
+              <CircularProgress size={28} />
+              <Typography variant="body2" color="text.secondary">กำลังเปิดกล้อง...</Typography>
+            </Stack>
+          )}
+          {scannerError && (
+            <Alert severity="warning" sx={{ borderRadius: 2 }}>
+              {scannerError}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setScannerOpen(false)} variant="contained">ปิด</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

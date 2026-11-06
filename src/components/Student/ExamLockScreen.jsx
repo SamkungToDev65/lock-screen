@@ -37,6 +37,22 @@ import {
 import { logViolation, submitExam, updateStudentStatus } from '../../services/api';
 import { playViolationSound, playSuccessSound } from '../../utils/sound';
 
+const normalizeExamEmbedUrl = (value) => {
+  try {
+    const url = new URL(value);
+    if (url.hostname !== 'drive.google.com') return value;
+
+    const filePathMatch = url.pathname.match(/^\/file\/d\/([^/]+)/i);
+    const fileId = filePathMatch?.[1] || url.searchParams.get('id');
+    if (!fileId) return value;
+
+    url.pathname = `/file/d/${fileId}/preview`;
+    return url.toString();
+  } catch (_) {
+    return value;
+  }
+};
+
 export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) {
   // Check actual browser fullscreen status
   const checkIsFullscreen = () => {
@@ -754,7 +770,7 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
         {room.examUrl ? (
           <iframe
             ref={iframeRef}
-            src={room.examUrl}
+            src={normalizeExamEmbedUrl(room.examUrl)}
             title="Online Exam Sheet"
             className="w-full h-full border-0 select-none bg-white"
             allow="fullscreen; clipboard-read; clipboard-write; microphone; camera"
