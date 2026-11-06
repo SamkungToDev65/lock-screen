@@ -15,6 +15,7 @@ import {
   Tooltip,
   Menu,
   MenuItem,
+  Divider,
 } from '@mui/material';
 import {
   Maximize2,
@@ -699,125 +700,126 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
           </div>
         </div>
 
-        {/* RIGHT: Exam Info, Tools Menu & Exit PIN Button */}
-        <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
-          <Tooltip title={watermarkEnabled ? 'ซ่อนลายน้ำนิรภัย' : 'แสดงลายน้ำนิรภัย'}>
-            <IconButton
-              size="small"
-              onClick={() => setWatermarkEnabled((prev) => !prev)}
-              sx={{
-                color: watermarkEnabled ? '#60a5fa' : '#64748b',
-                display: { xs: 'none', lg: 'inline-flex' },
-                p: 0.8,
-              }}
-            >
-              {watermarkEnabled ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-            </IconButton>
-          </Tooltip>
-
-          <Tooltip title="ข้อมูลและกฎการสอบ">
-            <IconButton
-              size="small"
-              onClick={() => setInfoModalOpen(true)}
-              sx={{
-                color: '#94a3b8',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#ffffff' },
-                p: { xs: 0.8, sm: 1 },
-                borderRadius: 2,
-              }}
-            >
-              <Info className="w-4 h-4" />
-            </IconButton>
-          </Tooltip>
-
+        {/* RIGHT: keep one large, easy-to-hit menu control */}
+        <div className="flex items-center shrink-0">
           <Tooltip title="เมนูเครื่องมือ">
             <IconButton
-              size="small"
-              aria-label="เปิดเมนูเครื่องมือ"
+              aria-label={`เปิดเมนูเครื่องมือ${violations > 0 ? ` มีการแจ้งเตือน ${violations} ครั้ง` : ''}`}
+              aria-haspopup="menu"
+              aria-expanded={Boolean(toolsMenuAnchor)}
+              aria-controls={toolsMenuAnchor ? 'exam-tools-menu' : undefined}
               onClick={(e) => setToolsMenuAnchor(e.currentTarget)}
               sx={{
                 color: '#cbd5e1',
                 backgroundColor: 'rgba(255, 255, 255, 0.05)',
                 '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#ffffff' },
-                p: { xs: 0.8, sm: 1 },
+                width: 48,
+                height: 48,
                 borderRadius: 2,
+                outlineOffset: 2,
+                '&.Mui-focusVisible': { outline: '3px solid #93c5fd' },
+                position: 'relative',
               }}
             >
-              <MenuIcon className="w-4 h-4" />
+              <MenuIcon className="w-6 h-6" aria-hidden="true" />
+              {violations > 0 && (
+                <Box
+                  component="span"
+                  aria-hidden="true"
+                  sx={{
+                    position: 'absolute', top: 1, right: 1, minWidth: 19, height: 19,
+                    px: 0.25, borderRadius: '999px', bgcolor: '#b91c1c', color: '#fff',
+                    border: '2px solid #0f172a', fontSize: 10, fontWeight: 900,
+                    lineHeight: '15px', textAlign: 'center',
+                  }}
+                >{violations > 99 ? '99+' : violations}</Box>
+              )}
             </IconButton>
           </Tooltip>
 
           <Menu
+            id="exam-tools-menu"
             anchorEl={toolsMenuAnchor}
             open={Boolean(toolsMenuAnchor)}
             onClose={() => setToolsMenuAnchor(null)}
             anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-            PaperProps={{ sx: { width: 260, borderRadius: 2.5, p: 0.5 } }}
+            PaperProps={{
+              sx: {
+                width: { xs: 'min(360px, calc(100vw - 16px))', sm: 340 },
+                maxHeight: 'min(80dvh, 560px)', overflowY: 'auto',
+                borderRadius: 2.5, p: 0.75,
+              },
+            }}
           >
-            <MenuItem
-              onClick={() => {
-                setToolsMenuAnchor(null);
-                setInfoModalOpen(true);
+            <Box
+              role="status"
+              aria-live="polite"
+              sx={{
+                minHeight: 52, px: 1.5, display: 'flex', alignItems: 'center', gap: 1.25,
+                borderRadius: 1.5, color: violations > 0 ? '#991b1b' : '#065f46',
+                bgcolor: violations > 0 ? '#fef2f2' : '#ecfdf5', fontWeight: 800,
               }}
-              sx={{ gap: 1.25, borderRadius: 1.5, color: violations > 0 ? '#dc2626' : '#059669', fontWeight: 700 }}
             >
-              {violations > 0 ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+              {violations > 0 ? <AlertTriangle size={20} aria-hidden="true" /> : <CheckCircle2 size={20} aria-hidden="true" />}
               {violations > 0 ? `การแจ้งเตือน ${violations} ครั้ง` : 'สถานะปกติ · ไม่มีการแจ้งเตือน'}
+            </Box>
+            <MenuItem
+              onClick={() => { setToolsMenuAnchor(null); setInfoModalOpen(true); }}
+              sx={{ minHeight: 48, gap: 1.25, borderRadius: 1.5, color: '#0f172a', fontWeight: 700 }}
+            >
+              <Info size={20} aria-hidden="true" /> ข้อมูลและคำแนะนำการสอบ
             </MenuItem>
-            <Box sx={{ px: 1.5, pt: 1, pb: 0.5, display: 'flex', alignItems: 'center', gap: 1, color: '#475569', fontSize: '0.85rem', fontWeight: 700 }}>
+            <MenuItem
+              onClick={() => { setToolsMenuAnchor(null); setWatermarkEnabled((prev) => !prev); }}
+              sx={{ minHeight: 48, gap: 1.25, borderRadius: 1.5, color: '#0f172a', fontWeight: 700 }}
+            >
+              {watermarkEnabled ? <Eye size={20} aria-hidden="true" /> : <EyeOff size={20} aria-hidden="true" />}
+              {watermarkEnabled ? 'ซ่อนลายน้ำนิรภัย' : 'แสดงลายน้ำนิรภัย'}
+            </MenuItem>
+            <Divider sx={{ my: 0.75 }} />
+            <Box sx={{ px: 1.5, pt: 0.5, pb: 0.5, display: 'flex', alignItems: 'center', gap: 1, color: '#334155', fontSize: '0.9rem', fontWeight: 800 }}>
               <Search size={17} /> ซูมเนื้อหาเอกสาร
             </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1, pb: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 0.5, pb: 0.75 }}>
               <IconButton
-                size="small"
                 aria-label="ซูมออก"
                 title="ซูมออก"
                 disabled={documentZoom <= 0.7}
                 onClick={() => setDocumentZoom((zoom) => Math.max(0.7, Number((zoom - 0.1).toFixed(1))))}
+                sx={{ width: 48, height: 48, '&.Mui-focusVisible': { outline: '3px solid #2563eb' } }}
               >
-                <ZoomOut size={19} />
+                <ZoomOut size={22} />
               </IconButton>
               <Typography variant="body2" sx={{ minWidth: 48, textAlign: 'center', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
                 {Math.round(documentZoom * 100)}%
               </Typography>
               <IconButton
-                size="small"
                 aria-label="ซูมเข้า"
                 title="ซูมเข้า"
                 disabled={documentZoom >= 2.5}
                 onClick={() => setDocumentZoom((zoom) => Math.min(2.5, Number((zoom + 0.1).toFixed(1))))}
+                sx={{ width: 48, height: 48, '&.Mui-focusVisible': { outline: '3px solid #2563eb' } }}
               >
-                <ZoomIn size={19} />
+                <ZoomIn size={22} />
               </IconButton>
-              <Button size="small" onClick={() => setDocumentZoom(1)} sx={{ ml: 0.5, textTransform: 'none', fontWeight: 700 }}>
+              <Button onClick={() => setDocumentZoom(1)} sx={{ minWidth: 64, minHeight: 44, ml: 0.5, textTransform: 'none', fontWeight: 800, color: '#1d4ed8' }}>
                 รีเซ็ต
               </Button>
             </Box>
+            <Divider sx={{ mb: 0.75 }} />
+            <MenuItem
+              onClick={() => { setToolsMenuAnchor(null); openExitModal(); }}
+              sx={{
+                minHeight: 50, gap: 1.25, borderRadius: 1.5, color: '#fff', bgcolor: '#b91c1c',
+                fontWeight: 800, justifyContent: 'center',
+                '&:hover': { bgcolor: '#991b1b' },
+                '&.Mui-focusVisible': { outline: '3px solid #1d4ed8', outlineOffset: 2 },
+              }}
+            >
+              <Unlock size={20} aria-hidden="true" /> ส่งข้อสอบและออก (Exit PIN)
+            </MenuItem>
           </Menu>
-
-          <Button
-            variant="contained"
-            color="error"
-            size="small"
-            onClick={openExitModal}
-            startIcon={<Unlock className="w-3.5 h-3.5" />}
-            sx={{
-              fontWeight: 800,
-              fontSize: { xs: '0.75rem', sm: '0.8rem' },
-              borderRadius: 2,
-              px: { xs: 1.2, sm: 2 },
-              py: { xs: 0.6, sm: 0.8 },
-              whiteSpace: 'nowrap',
-              minWidth: 'auto',
-              boxShadow: '0 4px 14px rgba(220, 38, 38, 0.35)',
-            }}
-          >
-            <span className="hidden xs:inline">ส่งข้อสอบ</span>
-            <span className="xs:hidden">ส่ง</span>
-            <span className="hidden md:inline">&nbsp;(Exit PIN)</span>
-          </Button>
         </div>
       </header>
 
