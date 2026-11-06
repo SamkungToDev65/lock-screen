@@ -6,8 +6,14 @@ import {
   Button,
   Box,
   Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  Alert,
 } from '@mui/material';
-import { ShieldCheck, Download } from 'lucide-react';
+import { ShieldCheck, Download, Share2, PlusSquare, X } from 'lucide-react';
 
 export default function Navbar({
   currentView,
@@ -15,13 +21,14 @@ export default function Navbar({
   onOpenSettings,
 }) {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [canInstallPWA, setCanInstallPWA] = useState(false);
+  const [installGuideOpen, setInstallGuideOpen] = useState(false);
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
   useEffect(() => {
     const handler = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      setCanInstallPWA(true);
     };
 
     window.addEventListener('beforeinstallprompt', handler);
@@ -29,18 +36,82 @@ export default function Navbar({
   }, []);
 
   const handleInstallPWA = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setCanInstallPWA(false);
+    if (isIOS || !deferredPrompt) {
+      setInstallGuideOpen(true);
+      return;
     }
+
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
     setDeferredPrompt(null);
   };
+
+  const installButton = (
+    <Button
+      variant="outlined"
+      color="primary"
+      size="small"
+      onClick={handleInstallPWA}
+      startIcon={<Download className="w-4 h-4" />}
+      sx={{ fontWeight: 700, borderRadius: 2 }}
+    >
+      ติดตั้ง PWA
+    </Button>
+  );
+
+  const installGuide = (
+    <Dialog
+      open={installGuideOpen}
+      onClose={() => setInstallGuideOpen(false)}
+      maxWidth="xs"
+      fullWidth
+      aria-labelledby="install-guide-title"
+    >
+      <DialogTitle id="install-guide-title" sx={{ pr: 6, fontWeight: 800 }}>
+        ติดตั้ง SAMMLocker
+        <IconButton
+          aria-label="ปิดคำแนะนำ"
+          onClick={() => setInstallGuideOpen(false)}
+          sx={{ position: 'absolute', right: 12, top: 12 }}
+        >
+          <X size={20} />
+        </IconButton>
+      </DialogTitle>
+      <DialogContent dividers>
+        {isIOS ? (
+          <Stack spacing={2}>
+            <Typography>เพิ่ม SAMMLocker ไปยังหน้าจอโฮมของ iPhone หรือ iPad:</Typography>
+            <Stack direction="row" spacing={1.5} alignItems="flex-start">
+              <Share2 size={20} />
+              <Typography>ใน Safari แตะปุ่ม <strong>แชร์</strong></Typography>
+            </Stack>
+            <Stack direction="row" spacing={1.5} alignItems="flex-start">
+              <PlusSquare size={20} />
+              <Typography>เลือก <strong>เพิ่มไปยังหน้าจอโฮม</strong> แล้วแตะ <strong>เพิ่ม</strong></Typography>
+            </Stack>
+            <Alert severity="info" sx={{ borderRadius: 2 }}>
+              หากเปิดจากเบราว์เซอร์ในแอป ให้เปิดหน้านี้ใน Safari ก่อน การเพิ่มแอปต้องยืนยันจากเมนูแชร์ของ iOS
+            </Alert>
+          </Stack>
+        ) : (
+          <Stack spacing={2}>
+            <Typography>หากเบราว์เซอร์ยังไม่แสดงหน้าติดตั้ง ให้เปิดเมนูเบราว์เซอร์แล้วเลือก <strong>ติดตั้งแอป</strong> หรือ <strong>เพิ่มไปยังหน้าจอหลัก</strong></Typography>
+            <Alert severity="info" sx={{ borderRadius: 2 }}>
+              แนะนำให้เปิดเว็บไซต์ด้วย Chrome หรือเบราว์เซอร์ที่รองรับ PWA
+            </Alert>
+          </Stack>
+        )}
+      </DialogContent>
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={() => setInstallGuideOpen(false)} variant="contained">เข้าใจแล้ว</Button>
+      </DialogActions>
+    </Dialog>
+  );
 
   // If on login or student-join page, render clean, non-duplicated minimal transparent header
   if (currentView === 'login' || currentView === 'student-join') {
     return (
+      <>
       <AppBar
         position="sticky"
         elevation={0}
@@ -79,26 +150,18 @@ export default function Navbar({
           </Box>
 
           <Stack direction="row" spacing={1.5} alignItems="center">
-            {canInstallPWA && (
-              <Button
-                variant="outlined"
-                color="primary"
-                size="small"
-                onClick={handleInstallPWA}
-                startIcon={<Download className="w-4 h-4" />}
-                sx={{ fontWeight: 700, borderRadius: 2 }}
-              >
-                ติดตั้ง PWA
-              </Button>
-            )}
+            {installButton}
           </Stack>
         </Toolbar>
       </AppBar>
+      {installGuide}
+      </>
     );
   }
 
   // Standard Header for Student views
   return (
+    <>
     <AppBar
       position="sticky"
       elevation={0}
@@ -139,20 +202,11 @@ export default function Navbar({
         </Box>
 
         <Stack direction="row" spacing={1.5} alignItems="center">
-          {canInstallPWA && (
-            <Button
-              variant="outlined"
-              color="primary"
-              size="small"
-              onClick={handleInstallPWA}
-              startIcon={<Download className="w-4 h-4" />}
-              sx={{ fontWeight: 700, borderRadius: 2 }}
-            >
-              ติดตั้ง PWA
-            </Button>
-          )}
+          {installButton}
         </Stack>
       </Toolbar>
     </AppBar>
+    {installGuide}
+    </>
   );
 }

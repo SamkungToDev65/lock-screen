@@ -77,6 +77,8 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
   const timerRef = useRef(null);
   const heartbeatRef = useRef(null);
   const isHandlingViolationRef = useRef(false);
+  const departureTimerRef = useRef(null);
+  const departureViolationLoggedRef = useRef(false);
 
   // Lock Escape key using Chrome/Edge Keyboard Lock API if available
   const lockKeyboardKeys = async () => {
@@ -221,13 +223,46 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
     document.addEventListener('mozfullscreenchange', onFullscreenChange);
     document.addEventListener('MSFullscreenChange', onFullscreenChange);
 
-    // 2. Tab switch & minimize listener
+    // 2. Distinguish a tab/app switch from a real page departure. Browsers
+    // often emit visibilitychange immediately before pagehide when closing.
     const onVisibilityChange = () => {
-      if (document.hidden && !submitted) {
-        handleViolationTrigger('TAB_SWITCH', 'สลับแท็บเบราว์เซอร์ หรือยุบหน้าจอสอบ');
+      if (submitted) return;
+
+      if (document.hidden) {
+        clearTimeout(departureTimerRef.current);
+        departureTimerRef.current = setTimeout(() => {
+          departureViolationLoggedRef.current = true;
+          handleViolationTrigger('TAB_SWITCH', 'สลับแท็บเบราว์เซอร์ หรือยุบหน้าจอสอบ');
+          departureTimerRef.current = null;
+        }, 900);
+      } else {
+        if (departureTimerRef.current) {
+          clearTimeout(departureTimerRef.current);
+          departureTimerRef.current = null;
+          departureViolationLoggedRef.current = true;
+          handleViolationTrigger('TAB_SWITCH', 'สลับแท็บเบราว์เซอร์ หรือยุบหน้าจอสอบ');
+        }
+        departureViolationLoggedRef.current = false;
       }
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
+
+    // pagehide fires after the user confirms leaving in the browser's
+    // beforeunload prompt. A persisted page is being cached, so count it as
+    // a tab switch instead of a browser exit.
+    const onPageHide = (event) => {
+      clearTimeout(departureTimerRef.current);
+      departureTimerRef.current = null;
+      if (submitted || departureViolationLoggedRef.current) return;
+
+      departureViolationLoggedRef.current = true;
+      if (event.persisted) {
+        handleViolationTrigger('TAB_SWITCH', 'ออกจากหน้าสอบชั่วคราว หรือสลับแท็บเบราว์เซอร์');
+      } else {
+        handleViolationTrigger('BROWSER_EXIT', 'ปิดแท็บหรือออกจากหน้าสอบ');
+      }
+    };
+    window.addEventListener('pagehide', onPageHide);
 
     // 3. Smart Window Blur listener (with iframe activeElement filter)
     const onWindowBlur = () => {
@@ -380,6 +415,8 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
       document.removeEventListener('mozfullscreenchange', onFullscreenChange);
       document.removeEventListener('MSFullscreenChange', onFullscreenChange);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('pagehide', onPageHide);
+      clearTimeout(departureTimerRef.current);
       window.removeEventListener('blur', onWindowBlur);
       window.removeEventListener('contextmenu', onContextMenu);
       window.removeEventListener('keydown', onKeyDown);
