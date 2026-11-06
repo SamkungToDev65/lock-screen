@@ -36,3 +36,15 @@
   user-select: none;
 }
 
+/* Keep document scrolling available while hiding the scrollbar affordance. */
+.exam-document-viewport {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.exam-document-viewport::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+

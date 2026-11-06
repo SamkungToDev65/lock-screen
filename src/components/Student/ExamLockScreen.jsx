@@ -98,12 +98,20 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
 
   const containerRef = useRef(null);
   const iframeRef = useRef(null);
+  const examViewportRef = useRef(null);
   const timerRef = useRef(null);
   const heartbeatRef = useRef(null);
   const isHandlingViolationRef = useRef(false);
-  const departureTimerRef = useRef(null);
   const departureViolationLoggedRef = useRef(false);
   const splitScreenDetectedRef = useRef(false);
+
+  useEffect(() => {
+    const viewport = examViewportRef.current;
+    if (!viewport) return;
+    viewport.scrollLeft = documentZoom > 1
+      ? Math.max(0, (viewport.scrollWidth - viewport.clientWidth) / 2)
+      : 0;
+  }, [documentZoom]);
 
   // Lock Escape key using Chrome/Edge Keyboard Lock API if available
   const lockKeyboardKeys = async () => {
@@ -248,25 +256,17 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
     document.addEventListener('mozfullscreenchange', onFullscreenChange);
     document.addEventListener('MSFullscreenChange', onFullscreenChange);
 
-    // 2. Distinguish a tab/app switch from a real page departure. Browsers
-    // often emit visibilitychange immediately before pagehide when closing.
+    // Count as soon as the exam page is backgrounded. Mobile browsers may
+    // terminate the app shortly after hiding it, before delayed timers run.
     const onVisibilityChange = () => {
       if (submitted) return;
 
       if (document.hidden) {
-        clearTimeout(departureTimerRef.current);
-        departureTimerRef.current = setTimeout(() => {
-          departureViolationLoggedRef.current = true;
-          handleViolationTrigger('TAB_SWITCH', 'สลับแท็บเบราว์เซอร์ หรือยุบหน้าจอสอบ');
-          departureTimerRef.current = null;
-        }, 900);
-      } else {
-        if (departureTimerRef.current) {
-          clearTimeout(departureTimerRef.current);
-          departureTimerRef.current = null;
+        if (!departureViolationLoggedRef.current) {
           departureViolationLoggedRef.current = true;
           handleViolationTrigger('TAB_SWITCH', 'สลับแท็บเบราว์เซอร์ หรือยุบหน้าจอสอบ');
         }
+      } else {
         departureViolationLoggedRef.current = false;
       }
     };
@@ -276,8 +276,6 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
     // beforeunload prompt. A persisted page is being cached, so count it as
     // a tab switch instead of a browser exit.
     const onPageHide = (event) => {
-      clearTimeout(departureTimerRef.current);
-      departureTimerRef.current = null;
       if (submitted || departureViolationLoggedRef.current) return;
 
       departureViolationLoggedRef.current = true;
@@ -452,7 +450,6 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
       document.removeEventListener('MSFullscreenChange', onFullscreenChange);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('pagehide', onPageHide);
-      clearTimeout(departureTimerRef.current);
       window.removeEventListener('blur', onWindowBlur);
       window.removeEventListener('contextmenu', onContextMenu);
       window.removeEventListener('keydown', onKeyDown);
@@ -823,11 +820,21 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
 
         {/* Secure Exam Iframe Shell */}
         {room.examUrl ? (
-          <div className="absolute inset-0 overflow-auto bg-white">
+          <div
+            ref={examViewportRef}
+            className="exam-document-viewport absolute inset-0 overflow-auto bg-white"
+            style={{
+              overscrollBehavior: 'contain',
+              WebkitOverflowScrolling: 'touch',
+            }}
+          >
             <div
               style={{
                 width: `${Math.max(1, documentZoom) * 100}%`,
                 height: `${Math.max(1, documentZoom) * 100}%`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
               <iframe
@@ -839,7 +846,7 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
                   width: `${100 / Math.max(1, documentZoom)}%`,
                   height: `${100 / Math.max(1, documentZoom)}%`,
                   transform: `scale(${documentZoom})`,
-                  transformOrigin: 'top left',
+                  transformOrigin: 'center center',
                 }}
                 allow="fullscreen; clipboard-read; clipboard-write; microphone; camera"
                 sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-modals"

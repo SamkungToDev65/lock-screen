@@ -448,6 +448,13 @@ export const updateStudentStatus = async (roomCode, studentId, status) => {
     student.lastPing = now;
     localStorage.setItem(LOCAL_STUDENTS_KEY, JSON.stringify(students));
   }
+
+  return apiPost({
+    action: 'updateStudentStatus',
+    roomCode: normalized,
+    studentId,
+    status,
+  });
 };
 
 /**
