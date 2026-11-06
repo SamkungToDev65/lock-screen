@@ -15,7 +15,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { Box, Drawer } from '@mui/material';
 
 class ExamScreenErrorBoundary extends Component {
-  state = { hasError: false };
+  state = { hasError: false, errorMessage: '' };
 
   static getDerivedStateFromError() {
     return { hasError: true };
@@ -23,6 +23,7 @@ class ExamScreenErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error('Exam screen render failed:', error, info);
+    this.setState({ errorMessage: error?.message || 'ไม่พบรายละเอียดข้อผิดพลาด' });
   }
 
   render() {
@@ -35,6 +36,12 @@ class ExamScreenErrorBoundary extends Component {
           <p className="mt-3 text-sm leading-6 text-slate-300">
             กรุณาลองโหลดหน้าใหม่ หากยังพบปัญหา ให้กลับไปหน้าเข้าห้องสอบและแจ้งอาจารย์ผู้คุมสอบ
           </p>
+          {this.state.errorMessage && (
+            <details open className="mt-4 rounded-lg border border-slate-700 bg-slate-950 p-3 text-left">
+              <summary className="cursor-pointer text-sm font-semibold text-slate-200">รายละเอียดสำหรับแจ้งผู้ดูแล</summary>
+              <code className="mt-2 block break-words text-xs text-amber-200">{this.state.errorMessage}</code>
+            </details>
+          )}
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
             <button
               type="button"

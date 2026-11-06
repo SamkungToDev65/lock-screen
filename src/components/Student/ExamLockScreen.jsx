@@ -31,6 +31,7 @@ import {
   Info,
   Volume2,
   Eye,
+  EyeOff,
   Hash,
   BookOpen,
   X,
