@@ -457,6 +457,22 @@ export const updateStudentStatus = async (roomCode, studentId, status) => {
   });
 };
 
+// Heartbeats only refresh liveness. They must not overwrite an audit status
+// (for example TAB_SWITCH) with ACTIVE while the exam is still in progress.
+export const sendStudentHeartbeat = async (roomCode, studentId) => {
+  const normalized = roomCode.toUpperCase();
+  const now = new Date().toLocaleString('th-TH');
+  const students = JSON.parse(localStorage.getItem(LOCAL_STUDENTS_KEY) || '[]');
+  const student = students.find(
+    (s) => s.roomCode.toUpperCase() === normalized && s.studentId === studentId
+  );
+  if (student) {
+    student.lastPing = now;
+    localStorage.setItem(LOCAL_STUDENTS_KEY, JSON.stringify(students));
+  }
+  return apiPost({ action: 'heartbeat', roomCode: normalized, studentId });
+};
+
 /**
  * Submit exam & verify Exit PIN
  */

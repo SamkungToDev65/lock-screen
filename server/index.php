@@ -31,7 +31,7 @@ if (empty($action)) {
         'available_actions' => [
             'ping', 'adminLogin', 'getRoom', 'listRooms', 'createRoom',
             'updateRoom', 'deleteRoom', 'joinRoom', 'logViolation',
-            'submitExam', 'resetStudent', 'forceSubmit', 'getDashboard', 'clearLogs'
+            'submitExam', 'resetStudent', 'forceSubmit', 'heartbeat', 'updateStudentStatus', 'getDashboard', 'clearLogs'
         ]
     ], 400);
 }
@@ -381,6 +381,18 @@ switch ($action) {
     // 12.1 Student Heartbeat / Status Ping
     // ----------------------------------------------------
     case 'heartbeat':
+        $roomCode = isset($params['roomCode']) ? strtoupper(trim($params['roomCode'])) : '';
+        $studentId = isset($params['studentId']) ? trim($params['studentId']) : '';
+        $now = date('Y-m-d H:i:s');
+
+        if (!empty($roomCode) && !empty($studentId)) {
+            $stmt = $pdo->prepare("UPDATE `students` SET `last_ping` = ? WHERE UPPER(`room_code`) = ? AND `student_id` = ?");
+            $stmt->execute([$now, $roomCode, $studentId]);
+        }
+
+        sendResponse(['success' => true]);
+        break;
+
     case 'updateStudentStatus':
         $roomCode = isset($params['roomCode']) ? strtoupper(trim($params['roomCode'])) : '';
         $studentId = isset($params['studentId']) ? trim($params['studentId']) : '';

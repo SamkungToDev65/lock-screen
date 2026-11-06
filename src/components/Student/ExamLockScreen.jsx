@@ -40,7 +40,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
-import { logViolation, submitExam, updateStudentStatus } from '../../services/api';
+import { logViolation, sendStudentHeartbeat, submitExam, updateStudentStatus } from '../../services/api';
 import { playViolationSound, playSuccessSound } from '../../utils/sound';
 
 const normalizeExamEmbedUrl = (value) => {
@@ -100,10 +100,10 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
   const iframeRef = useRef(null);
   const examViewportRef = useRef(null);
   const timerRef = useRef(null);
-  const heartbeatRef = useRef(null);
   const isHandlingViolationRef = useRef(false);
   const departureViolationLoggedRef = useRef(false);
   const splitScreenDetectedRef = useRef(false);
+  const recentViolationRef = useRef(new Map());
 
   useEffect(() => {
     const viewport = examViewportRef.current;
@@ -143,17 +143,39 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
     return () => clearInterval(timerRef.current);
   }, []);
 
-  // Periodic Proctor Heartbeat (Every 15s)
+  // Heartbeat updates liveness only; pause in background and send immediately
+  // when the exam becomes visible again. Recursive timeout prevents overlapping
+  // requests on slow mobile connections.
   useEffect(() => {
     if (submitted) return;
-    const sendHeartbeat = () => {
-      if (room.roomCode && student.studentId) {
-        updateStudentStatus(room.roomCode, student.studentId, 'ACTIVE');
+    let timer;
+    let stopped = false;
+    let inFlight = false;
+    const sendHeartbeat = async () => {
+      if (stopped) return;
+      if (!document.hidden && navigator.onLine && room.roomCode && student.studentId && !inFlight) {
+        inFlight = true;
+        try {
+          await sendStudentHeartbeat(room.roomCode, student.studentId);
+        } finally {
+          inFlight = false;
+        }
+      }
+      if (!stopped) timer = setTimeout(sendHeartbeat, 15000);
+    };
+    const onVisibilityChange = () => {
+      if (!document.hidden) {
+        clearTimeout(timer);
+        sendHeartbeat();
       }
     };
+    document.addEventListener('visibilitychange', onVisibilityChange);
     sendHeartbeat();
-    heartbeatRef.current = setInterval(sendHeartbeat, 15000);
-    return () => clearInterval(heartbeatRef.current);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, [room.roomCode, student.studentId, submitted]);
 
   // Online / Offline monitor
@@ -198,6 +220,14 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
   // Trigger Violation Event & Popup Alert
   const handleViolationTrigger = useCallback(async (type, reason) => {
     if (submitted) return;
+
+    // Different browser signals can describe the same action (Escape and the
+    // resulting fullscreenchange, for example). Collapse only near-identical
+    // repeats while keeping later, distinct incidents countable.
+    const now = Date.now();
+    const lastSeen = recentViolationRef.current.get(type) || 0;
+    if (now - lastSeen < 1200) return;
+    recentViolationRef.current.set(type, now);
 
     // Play warning sound & mobile vibration
     if (soundEnabled) {
@@ -300,7 +330,9 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
         }
 
         // If focus is truly outside window (Alt+Tab, dual monitor, or clicked desktop application)
-        if (!document.hasFocus() || document.hidden) {
+        // Visibility is handled by visibilitychange; don't count the same
+        // backgrounding as both TAB_SWITCH and BLUR.
+        if (!document.hidden && !document.hasFocus()) {
           handleViolationTrigger('BLUR', 'คลิกออกนอกหน้าต่างสอบ หรือเปิดโปรแกรมอื่น');
         }
       }, 120);
@@ -395,6 +427,9 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
         if (submitted) return;
+        // Pinch/browser zoom changes the CSS viewport without changing the
+        // actual app layout. Ignore those temporary dimensions.
+        if ((window.visualViewport?.scale || 1) > 1.05) return;
 
         // Touch browsers change viewport height as their chrome appears while
         // scrolling, so use width only on phones/tablets. Side-by-side split
