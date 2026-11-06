@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { Component, useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import AdminSidebar from './components/Layout/AdminSidebar';
 import AdminTopbar from './components/Layout/AdminTopbar';
@@ -13,6 +13,49 @@ import StudentJoin from './components/Student/StudentJoin';
 import ExamLockScreen from './components/Student/ExamLockScreen';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Box, Drawer } from '@mui/material';
+
+class ExamScreenErrorBoundary extends Component {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, info) {
+    console.error('Exam screen render failed:', error, info);
+  }
+
+  render() {
+    if (!this.state.hasError) return this.props.children;
+
+    return (
+      <main className="min-h-screen bg-slate-950 flex items-center justify-center p-5" role="alert">
+        <section className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 text-center text-white shadow-2xl">
+          <h1 className="text-xl font-bold">เปิดหน้าล็อกข้อสอบไม่สำเร็จ</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-300">
+            กรุณาลองโหลดหน้าใหม่ หากยังพบปัญหา ให้กลับไปหน้าเข้าห้องสอบและแจ้งอาจารย์ผู้คุมสอบ
+          </p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="min-h-12 rounded-xl bg-blue-600 px-5 font-bold text-white hover:bg-blue-700 focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-blue-300"
+            >
+              โหลดหน้าใหม่
+            </button>
+            <button
+              type="button"
+              onClick={this.props.onExitExam}
+              className="min-h-12 rounded-xl border border-slate-500 px-5 font-bold text-white hover:bg-slate-800 focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-blue-300"
+            >
+              กลับไปหน้าเข้าห้องสอบ
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
+}
 
 function AppContent() {
   const { isAuthenticated } = useAuth();
@@ -141,11 +184,13 @@ function AppContent() {
   // 1. FULLSCREEN EXAM ACTIVE
   if (currentView === 'exam-active' && activeExamSession) {
     return (
-      <ExamLockScreen
-        room={activeExamSession.room}
-        student={activeExamSession.student}
-        onExitExam={handleExitExam}
-      />
+      <ExamScreenErrorBoundary onExitExam={handleExitExam}>
+        <ExamLockScreen
+          room={activeExamSession.room}
+          student={activeExamSession.student}
+          onExitExam={handleExitExam}
+        />
+      </ExamScreenErrorBoundary>
     );
   }
 
