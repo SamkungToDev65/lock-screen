@@ -324,23 +324,35 @@ export const deleteRoom = async (roomCode) => {
  * Student joins room
  */
 export const joinRoom = async (roomCode, studentId, studentName) => {
-  const normalized = roomCode.toUpperCase();
+  const normalized = roomCode.trim().toUpperCase();
+  const normalizedStudentId = studentId.trim();
+  const normalizedStudentName = studentName.trim();
   const now = new Date().toLocaleString('th-TH');
+
+  const response = await apiPost({
+    action: 'joinRoom',
+    roomCode: normalized,
+    studentId: normalizedStudentId,
+    studentName: normalizedStudentName,
+  });
+  if (!response?.success) {
+    throw new Error(response?.error || 'เซิร์ฟเวอร์ยังยืนยันการเข้าห้องไม่ได้ กรุณาลองอีกครั้ง');
+  }
 
   const students = JSON.parse(localStorage.getItem(LOCAL_STUDENTS_KEY) || '[]');
   let student = students.find(
-    (s) => s.roomCode.toUpperCase() === normalized && s.studentId === studentId
+    (s) => s.roomCode.toUpperCase() === normalized && s.studentId === normalizedStudentId
   );
 
   if (student) {
-    student.studentName = studentName;
+    student.studentName = normalizedStudentName;
     student.status = 'ACTIVE';
     student.lastPing = now;
   } else {
     student = {
       roomCode: normalized,
-      studentId: studentId.trim(),
-      studentName: studentName.trim(),
+      studentId: normalizedStudentId,
+      studentName: normalizedStudentName,
       joinedAt: now,
       status: 'ACTIVE',
       violations: 0,
@@ -350,14 +362,7 @@ export const joinRoom = async (roomCode, studentId, studentName) => {
     students.push(student);
   }
   localStorage.setItem(LOCAL_STUDENTS_KEY, JSON.stringify(students));
-  logAuditLocal(normalized, studentId, studentName, 'STUDENT_JOINED', 'เข้าสู่ห้องสอบ');
-
-  apiPost({
-    action: 'joinRoom',
-    roomCode: normalized,
-    studentId,
-    studentName,
-  });
+  logAuditLocal(normalized, normalizedStudentId, normalizedStudentName, 'STUDENT_JOINED', 'เข้าสู่ห้องสอบ');
 
   return { success: true, student };
 };

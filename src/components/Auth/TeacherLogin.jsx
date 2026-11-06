@@ -17,6 +17,10 @@ import {
   Paper,
   Grid,
   Skeleton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  LinearProgress,
 } from '@mui/material';
 import {
   Lock,
@@ -66,7 +70,18 @@ export default function TeacherLogin({
   const [checkingRoom, setCheckingRoom] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [loadingStudent, setLoadingStudent] = useState(false);
+  const [loadingElapsed, setLoadingElapsed] = useState(0);
   const [errorStudent, setErrorStudent] = useState('');
+
+  useEffect(() => {
+    if (!loadingStudent) {
+      setLoadingElapsed(0);
+      return undefined;
+    }
+    const startedAt = Date.now();
+    const timer = setInterval(() => setLoadingElapsed((Date.now() - startedAt) / 1000), 100);
+    return () => clearInterval(timer);
+  }, [loadingStudent]);
 
   // Sync tab if prop changes
   useEffect(() => {
@@ -152,28 +167,32 @@ export default function TeacherLogin({
       return;
     }
 
+    // Keep the fullscreen request inside the user click before waiting on the
+    // stagger timer or network; browser user activation may otherwise expire.
+    try {
+      const root = document.documentElement;
+      if (root.requestFullscreen) await root.requestFullscreen();
+      else if (root.webkitRequestFullscreen) await root.webkitRequestFullscreen();
+    } catch (fsErr) {
+      console.warn('Fullscreen request prompt notice:', fsErr);
+    }
+
+    const loadingStartedAt = Date.now();
+    setLoadingElapsed(0);
     setLoadingStudent(true);
     try {
       const rRes = await getRoom(roomCode.trim());
       if (!rRes.success || !rRes.room) {
         setErrorStudent(rRes.error || 'ไม่พบห้องสอบที่ระบุ กรุณาตรวจสอบรหัสห้องอีกครั้ง');
-        setLoadingStudent(false);
+        const remaining = 5000 - (Date.now() - loadingStartedAt);
+        if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
         return;
       }
 
       const jRes = await joinRoom(roomCode.trim(), studentId.trim(), studentName.trim());
       if (jRes.success) {
-        // Request Fullscreen
-        try {
-          if (document.documentElement.requestFullscreen) {
-            await document.documentElement.requestFullscreen();
-          } else if (document.documentElement.webkitRequestFullscreen) {
-            await document.documentElement.webkitRequestFullscreen();
-          }
-        } catch (fsErr) {
-          console.warn('Fullscreen request prompt notice:', fsErr);
-        }
-
+        const remaining = 5000 - (Date.now() - loadingStartedAt);
+        if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
         if (onStartExam) {
           onStartExam({
             room: rRes.room,
@@ -184,7 +203,9 @@ export default function TeacherLogin({
         setErrorStudent(jRes.error || 'เกิดข้อผิดพลาดในการลงทะเบียนเข้าห้องสอบ');
       }
     } catch (err) {
-      setErrorStudent(err.message || 'ไม่สามารถเริ่มทำข้อสอบได้');
+      const remaining = 5000 - (Date.now() - loadingStartedAt);
+      if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+      setErrorStudent(err.message || 'ไม่สามารถบันทึกการเข้าห้องได้ กรุณาลองอีกครั้ง');
     } finally {
       setLoadingStudent(false);
     }
@@ -1241,6 +1262,40 @@ export default function TeacherLogin({
           </Grid>
         </Grid>
       </Card>
+      <Dialog
+        open={loadingStudent}
+        disableEscapeKeyDown
+        aria-labelledby="student-join-loading-title"
+        PaperProps={{ sx: { width: 'min(420px, calc(100% - 32px))', borderRadius: 4, p: 1 } }}
+      >
+        <DialogTitle id="student-join-loading-title" sx={{ textAlign: 'center', pt: 3, fontWeight: 800 }}>
+          กำลังเข้าสู่ห้องสอบ
+        </DialogTitle>
+        <DialogContent sx={{ textAlign: 'center', pb: 3 }}>
+          <Box sx={{ width: 56, height: 56, mx: 'auto', mb: 2, color: '#2563eb' }}>
+            <CircularProgress size={56} thickness={4} aria-label="กำลังโหลด" />
+          </Box>
+          <Typography variant="h6" sx={{ color: '#0f172a', fontWeight: 800, mb: 0.5 }}>
+            {roomInfo?.title || roomCode || 'กำลังตรวจสอบห้องสอบ'}
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#475569', mb: 2 }}>
+            ห้อง {roomCode || '—'} · {studentName || 'ผู้เข้าสอบ'}
+          </Typography>
+          <LinearProgress
+            variant="determinate"
+            value={Math.min(100, (loadingElapsed / 5) * 100)}
+            sx={{ height: 8, borderRadius: 8, mb: 1.25, bgcolor: '#dbeafe', '& .MuiLinearProgress-bar': { borderRadius: 8 } }}
+          />
+          <Typography variant="body2" aria-live="polite" sx={{ color: '#334155', fontWeight: 700 }}>
+            {loadingElapsed < 5
+              ? `กำลังเตรียมข้อมูล ${Math.min(5, Math.floor(loadingElapsed) + 1)} / 5 วินาที`
+              : 'กำลังรอการยืนยันจากเซิร์ฟเวอร์...'}
+          </Typography>
+          <Typography variant="caption" sx={{ display: 'block', color: '#64748b', mt: 1 }}>
+            กรุณาอย่าปิดหน้านี้
+          </Typography>
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 }

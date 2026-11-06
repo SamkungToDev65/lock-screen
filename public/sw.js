@@ -1,4 +1,4 @@
-const CACHE_NAME = 'secure-exam-v3';
+const CACHE_NAME = 'secure-exam-v4';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -49,6 +49,20 @@ self.addEventListener('fetch', (event) => {
 
   // Network first with cache fallback for local app shell
   event.respondWith(
+    // Vite assets are content-hashed and immutable. Prefer cached chunks so
+    // slow networks and repeat visits do not wait on the network unnecessarily.
+    url.pathname.startsWith('/assets/')
+      ? caches.match(event.request).then((cached) => {
+          if (cached) return cached;
+          return fetch(event.request).then((response) => {
+            if (response && response.status === 200) {
+              const copy = response.clone();
+              event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)));
+            }
+            return response;
+          });
+        })
+      :
     fetch(event.request)
       .then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200) {

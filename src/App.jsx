@@ -1,18 +1,20 @@
-import React, { Component, useState, useEffect } from 'react';
-import Navbar from './components/Navbar';
-import AdminSidebar from './components/Layout/AdminSidebar';
-import AdminTopbar from './components/Layout/AdminTopbar';
-import TeacherDashboard from './components/Teacher/TeacherDashboard';
-import AdminPortal from './components/Teacher/AdminPortal';
-import TeacherLogin from './components/Auth/TeacherLogin';
-import CreateRoomModal from './components/Teacher/CreateRoomModal';
-import RoomQRModal from './components/Teacher/RoomQRModal';
-import ProjectorModal from './components/Teacher/ProjectorModal';
-import SettingsModal from './components/SettingsModal';
-import StudentJoin from './components/Student/StudentJoin';
-import ExamLockScreen from './components/Student/ExamLockScreen';
+import React, { Component, Suspense, lazy, useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Box, Drawer } from '@mui/material';
+
+// Split large views into route-level chunks so student clients do not need to
+// download teacher dashboards and reports before joining an exam.
+const Navbar = lazy(() => import('./components/Navbar'));
+const AdminSidebar = lazy(() => import('./components/Layout/AdminSidebar'));
+const AdminTopbar = lazy(() => import('./components/Layout/AdminTopbar'));
+const TeacherDashboard = lazy(() => import('./components/Teacher/TeacherDashboard'));
+const AdminPortal = lazy(() => import('./components/Teacher/AdminPortal'));
+const TeacherLogin = lazy(() => import('./components/Auth/TeacherLogin'));
+const CreateRoomModal = lazy(() => import('./components/Teacher/CreateRoomModal'));
+const RoomQRModal = lazy(() => import('./components/Teacher/RoomQRModal'));
+const ProjectorModal = lazy(() => import('./components/Teacher/ProjectorModal'));
+const SettingsModal = lazy(() => import('./components/SettingsModal'));
+const ExamLockScreen = lazy(() => import('./components/Student/ExamLockScreen'));
 
 class ExamScreenErrorBoundary extends Component {
   state = { hasError: false, errorMessage: '' };
@@ -328,13 +330,13 @@ function AppContent() {
         </Box>
 
         {/* Global Modals */}
-        <CreateRoomModal
+        {modalCreateRoom && <CreateRoomModal
           open={modalCreateRoom}
           onClose={() => setModalCreateRoom(false)}
           onRoomCreated={handleRoomCreated}
-        />
+        />}
 
-        <RoomQRModal
+        {modalQR && <RoomQRModal
           open={modalQR}
           onClose={() => setModalQR(false)}
           room={activeModalRoom}
@@ -342,18 +344,18 @@ function AppContent() {
             setActiveModalRoom(room);
             setModalProjector(true);
           }}
-        />
+        />}
 
-        <ProjectorModal
+        {modalProjector && <ProjectorModal
           open={modalProjector}
           onClose={() => setModalProjector(false)}
           room={activeModalRoom}
-        />
+        />}
 
-        <SettingsModal
+        {modalSettings && <SettingsModal
           open={modalSettings}
           onClose={() => setModalSettings(false)}
-        />
+        />}
       </Box>
     );
   }
@@ -378,32 +380,10 @@ function AppContent() {
       </Box>
 
       {/* Global Modals */}
-      <CreateRoomModal
-        open={modalCreateRoom}
-        onClose={() => setModalCreateRoom(false)}
-        onRoomCreated={handleRoomCreated}
-      />
-
-      <RoomQRModal
-        open={modalQR}
-        onClose={() => setModalQR(false)}
-        room={activeModalRoom}
-        onOpenProjector={(room) => {
-          setActiveModalRoom(room);
-          setModalProjector(true);
-        }}
-      />
-
-      <ProjectorModal
-        open={modalProjector}
-        onClose={() => setModalProjector(false)}
-        room={activeModalRoom}
-      />
-
-      <SettingsModal
+      {modalSettings && <SettingsModal
         open={modalSettings}
         onClose={() => setModalSettings(false)}
-      />
+      />}
     </Box>
   );
 }
@@ -411,7 +391,9 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <Suspense fallback={null}>
+        <AppContent />
+      </Suspense>
     </AuthProvider>
   );
 }
