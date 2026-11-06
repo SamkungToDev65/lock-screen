@@ -31,7 +31,6 @@ import {
   Info,
   Volume2,
   Eye,
-  EyeOff,
   Hash,
   BookOpen,
   X,
@@ -92,7 +91,7 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [infoModalOpen, setInfoModalOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [watermarkEnabled, setWatermarkEnabled] = useState(true);
+  const watermarkEnabled = true;
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [documentZoom, setDocumentZoom] = useState(1);
   const [toolsMenuAnchor, setToolsMenuAnchor] = useState(null);
@@ -365,18 +364,21 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
         }
       }
 
-      // PrintScreen / Screenshot shortcut
+      // Best-effort block for screenshot shortcuts delivered to the page.
+      // OS-reserved shortcuts and hardware buttons may never reach a website.
       if (
         e.key === 'PrintScreen' ||
-        (e.shiftKey && e.metaKey && ['3', '4', 's', 'S'].includes(e.key))
+        e.code === 'PrintScreen' ||
+        ((e.metaKey || e.ctrlKey) && e.shiftKey && ['3', '4', '5', 's', 'S'].includes(e.key))
       ) {
         e.preventDefault();
+        e.stopImmediatePropagation?.();
         try {
           if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText('');
+            navigator.clipboard.writeText('').catch(() => {});
           }
         } catch (_) {}
-        handleViolationTrigger('SCREENSHOT_ATTEMPT', 'ตรวจพบการพยายามจับภาพหน้าจอ (PrintScreen)');
+        handleViolationTrigger('SCREENSHOT_ATTEMPT', 'ตรวจพบคีย์ลัดพยายามจับภาพหน้าจอ');
         return false;
       }
 
@@ -420,7 +422,7 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
         return false;
       }
     };
-    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKeyDown, true);
 
     // 6. Window resize / split screen detection
     let resizeTimer = null;
@@ -488,7 +490,7 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
       window.removeEventListener('pagehide', onPageHide);
       window.removeEventListener('blur', onWindowBlur);
       window.removeEventListener('contextmenu', onContextMenu);
-      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('resize', onResize);
       clearTimeout(resizeTimer);
       window.removeEventListener('beforeunload', onBeforeUnload);
@@ -770,12 +772,8 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
             >
               <Info size={20} aria-hidden="true" /> ข้อมูลและคำแนะนำการสอบ
             </MenuItem>
-            <MenuItem
-              onClick={() => { setToolsMenuAnchor(null); setWatermarkEnabled((prev) => !prev); }}
-              sx={{ minHeight: 48, gap: 1.25, borderRadius: 1.5, color: '#0f172a', fontWeight: 700 }}
-            >
-              {watermarkEnabled ? <Eye size={20} aria-hidden="true" /> : <EyeOff size={20} aria-hidden="true" />}
-              {watermarkEnabled ? 'ซ่อนลายน้ำนิรภัย' : 'แสดงลายน้ำนิรภัย'}
+            <MenuItem disabled sx={{ minHeight: 48, gap: 1.25, borderRadius: 1.5, color: '#334155 !important', opacity: '1 !important' }}>
+              <Eye size={20} aria-hidden="true" /> ลายน้ำระบุตัวผู้สอบเปิดอยู่ตลอด
             </MenuItem>
             <Divider sx={{ my: 0.75 }} />
             <Box sx={{ px: 1.5, pt: 0.5, pb: 0.5, display: 'flex', alignItems: 'center', gap: 1, color: '#334155', fontSize: '0.9rem', fontWeight: 800 }}>
@@ -1217,7 +1215,8 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
                 <li>ห้ามออกจากโหมดเต็มจอ หรือกดปุ่ม ESC / F11</li>
                 <li>ห้ามสลับไปแท็บอื่น หรือเปิดโปรแกรมใดๆ บนเครื่อง</li>
                 <li>ห้ามแบ่งหน้าจอ (Split Screen) หรือใช้จอเสริม</li>
-                <li>ห้ามพยายามจับภาพหน้าจอ (PrintScreen) หรือเปิด DevTools</li>
+                <li>ห้ามจับภาพหน้าจอหรือเปิด DevTools ระบบจะบันทึกคีย์ลัดจับภาพที่เบราว์เซอร์แจ้ง และแสดงลายน้ำระบุตัวผู้สอบตลอดการสอบ</li>
+                <li className="text-amber-800">ปุ่มจับภาพของระบบปฏิบัติการหรืออุปกรณ์อาจบล็อกไม่ได้</li>
                 <li>เมื่อทำข้อสอบเสร็จ ให้กดส่งในแบบฟอร์มก่อน แล้วติดต่ออาจารย์เพื่อรับ Exit PIN</li>
               </ul>
             </div>
