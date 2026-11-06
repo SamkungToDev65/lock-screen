@@ -48,6 +48,8 @@ import {
   Laptop,
   ChevronLeft,
   ChevronRight,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import {
   getDashboardData,
@@ -77,6 +79,7 @@ export default function TeacherDashboard({
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedPin, setCopiedPin] = useState(false);
+  const [showExitPin, setShowExitPin] = useState(false);
 
   // Student action menu
   const [menuAnchor, setMenuAnchor] = useState(null);
@@ -113,6 +116,10 @@ export default function TeacherDashboard({
       if (found) setCurrentRoom(found);
     }
   }, [selectedRoomCode, rooms]);
+
+  useEffect(() => {
+    setShowExitPin(false);
+  }, [selectedRoomCode]);
 
   const loadData = async (isManual = false) => {
     if (!selectedRoomCode) return;
@@ -382,9 +389,19 @@ export default function TeacherDashboard({
                     EXIT PIN (รหัสปลดล็อก)
                   </Typography>
                   <Typography variant="h5" sx={{ fontFamily: 'monospace', fontWeight: 900, color: '#fef3c7', letterSpacing: 3, lineHeight: 1.1 }}>
-                    {currentRoom.exitPin}
+                    {showExitPin
+                      ? currentRoom.exitPin
+                      : '*'.repeat(String(currentRoom.exitPin || '').length || 4)}
                   </Typography>
                 </Box>
+                <IconButton
+                  size="small"
+                  aria-label={showExitPin ? 'ซ่อนรหัส Exit PIN' : 'แสดงรหัส Exit PIN'}
+                  onClick={() => setShowExitPin((visible) => !visible)}
+                  sx={{ color: '#fbbf24', border: '1px solid rgba(251, 191, 36, 0.3)' }}
+                >
+                  {showExitPin ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                </IconButton>
                 <IconButton size="small" onClick={handleCopyPin} sx={{ color: '#fbbf24', border: '1px solid rgba(251, 191, 36, 0.3)' }}>
                   {copiedPin ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                 </IconButton>

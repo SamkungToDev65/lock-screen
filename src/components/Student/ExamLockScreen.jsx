@@ -442,6 +442,16 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
     };
   }, [submitted, exitModalOpen, infoModalOpen, handleViolationTrigger, isTouchDevice]);
 
+  const openExitModal = () => {
+    setShowExitPin(false);
+    setExitModalOpen(true);
+  };
+
+  const closeExitModal = () => {
+    setShowExitPin(false);
+    setExitModalOpen(false);
+  };
+
   // Handle Exit PIN verify
   const handleVerifyExitPin = async (e) => {
     e.preventDefault();
@@ -459,7 +469,7 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
       if (res.success) {
         playSuccessSound();
         setSubmitted(true);
-        setExitModalOpen(false);
+        closeExitModal();
         setWarningModalOpen(false);
 
         if (document.exitFullscreen) {
@@ -688,7 +698,7 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
             variant="contained"
             color="error"
             size="small"
-            onClick={() => setExitModalOpen(true)}
+            onClick={openExitModal}
             startIcon={<Unlock className="w-3.5 h-3.5" />}
             sx={{
               fontWeight: 800,
@@ -859,7 +869,7 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
       {/* ========================================================= */}
       <Dialog
         open={exitModalOpen}
-        onClose={() => setExitModalOpen(false)}
+        onClose={closeExitModal}
         maxWidth="xs"
         fullWidth
         aria-labelledby="exit-modal-title"
@@ -900,7 +910,7 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
                 </div>
               </Box>
 
-              <IconButton size="small" onClick={() => setExitModalOpen(false)}>
+              <IconButton size="small" onClick={closeExitModal}>
                 <X className="w-4 h-4 text-slate-400" />
               </IconButton>
             </Box>
@@ -952,10 +962,12 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
                   endAdornment: (
                     <IconButton
                       size="small"
+                      type="button"
+                      aria-label={showExitPin ? 'ซ่อนรหัส Exit PIN' : 'แสดงรหัส Exit PIN'}
                       onClick={() => setShowExitPin((prev) => !prev)}
                       sx={{ color: '#94a3b8' }}
                     >
-                      {showExitPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showExitPin ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                     </IconButton>
                   ),
                 }}
@@ -965,7 +977,7 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
 
           <DialogActions sx={{ p: { xs: 2, sm: 2.5 }, backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
             <Button
-              onClick={() => setExitModalOpen(false)}
+              onClick={closeExitModal}
               color="inherit"
               disabled={submitting}
               sx={{ fontWeight: 700 }}
