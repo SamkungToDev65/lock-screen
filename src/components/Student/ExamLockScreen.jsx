@@ -13,6 +13,8 @@ import {
   Paper,
   IconButton,
   Tooltip,
+  Menu,
+  MenuItem,
 } from '@mui/material';
 import {
   Maximize2,
@@ -33,6 +35,10 @@ import {
   BookOpen,
   X,
   ShieldAlert,
+  Menu as MenuIcon,
+  Search,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import { logViolation, submitExam, updateStudentStatus } from '../../services/api';
 import { playViolationSound, playSuccessSound } from '../../utils/sound';
@@ -87,6 +93,8 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [watermarkEnabled, setWatermarkEnabled] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [documentZoom, setDocumentZoom] = useState(1);
+  const [toolsMenuAnchor, setToolsMenuAnchor] = useState(null);
 
   const containerRef = useRef(null);
   const iframeRef = useRef(null);
@@ -659,7 +667,7 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
           </div>
         </div>
 
-        {/* RIGHT: Violation Pill, Info & Exit PIN Button */}
+        {/* RIGHT: Exam Info, Tools Menu & Exit PIN Button */}
         <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
           <Tooltip title={watermarkEnabled ? 'ซ่อนลายน้ำนิรภัย' : 'แสดงลายน้ำนิรภัย'}>
             <IconButton
@@ -674,25 +682,6 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
               {watermarkEnabled ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
             </IconButton>
           </Tooltip>
-
-          {violations > 0 ? (
-            <div
-              onClick={() => setInfoModalOpen(true)}
-              className="cursor-pointer flex items-center space-x-1 px-2 sm:px-2.5 py-1 rounded-lg bg-red-950/80 text-red-400 font-mono text-[11px] sm:text-xs font-bold border border-red-700/70 animate-pulse shadow-sm shadow-red-900/40"
-            >
-              <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-              <span className="hidden sm:inline">หลุดจอ</span>
-              <span>{violations} ครั้ง</span>
-            </div>
-          ) : (
-            <div
-              onClick={() => setInfoModalOpen(true)}
-              className="cursor-pointer hidden lg:flex items-center space-x-1 px-2 py-1 rounded-lg bg-emerald-950/40 text-emerald-400 font-mono text-[10px] font-semibold border border-emerald-800/40"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              <span>ปกติ 0 เตือน</span>
-            </div>
-          )}
 
           <Tooltip title="ข้อมูลและกฎการสอบ">
             <IconButton
@@ -709,6 +698,72 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
               <Info className="w-4 h-4" />
             </IconButton>
           </Tooltip>
+
+          <Tooltip title="เมนูเครื่องมือ">
+            <IconButton
+              size="small"
+              aria-label="เปิดเมนูเครื่องมือ"
+              onClick={(e) => setToolsMenuAnchor(e.currentTarget)}
+              sx={{
+                color: '#cbd5e1',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#ffffff' },
+                p: { xs: 0.8, sm: 1 },
+                borderRadius: 2,
+              }}
+            >
+              <MenuIcon className="w-4 h-4" />
+            </IconButton>
+          </Tooltip>
+
+          <Menu
+            anchorEl={toolsMenuAnchor}
+            open={Boolean(toolsMenuAnchor)}
+            onClose={() => setToolsMenuAnchor(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            PaperProps={{ sx: { width: 260, borderRadius: 2.5, p: 0.5 } }}
+          >
+            <MenuItem
+              onClick={() => {
+                setToolsMenuAnchor(null);
+                setInfoModalOpen(true);
+              }}
+              sx={{ gap: 1.25, borderRadius: 1.5, color: violations > 0 ? '#dc2626' : '#059669', fontWeight: 700 }}
+            >
+              {violations > 0 ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+              {violations > 0 ? `การแจ้งเตือน ${violations} ครั้ง` : 'สถานะปกติ · ไม่มีการแจ้งเตือน'}
+            </MenuItem>
+            <Box sx={{ px: 1.5, pt: 1, pb: 0.5, display: 'flex', alignItems: 'center', gap: 1, color: '#475569', fontSize: '0.85rem', fontWeight: 700 }}>
+              <Search size={17} /> ซูมเนื้อหาเอกสาร
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1, pb: 1 }}>
+              <IconButton
+                size="small"
+                aria-label="ซูมออก"
+                title="ซูมออก"
+                disabled={documentZoom <= 0.7}
+                onClick={() => setDocumentZoom((zoom) => Math.max(0.7, Number((zoom - 0.1).toFixed(1))))}
+              >
+                <ZoomOut size={19} />
+              </IconButton>
+              <Typography variant="body2" sx={{ minWidth: 48, textAlign: 'center', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+                {Math.round(documentZoom * 100)}%
+              </Typography>
+              <IconButton
+                size="small"
+                aria-label="ซูมเข้า"
+                title="ซูมเข้า"
+                disabled={documentZoom >= 2.5}
+                onClick={() => setDocumentZoom((zoom) => Math.min(2.5, Number((zoom + 0.1).toFixed(1))))}
+              >
+                <ZoomIn size={19} />
+              </IconButton>
+              <Button size="small" onClick={() => setDocumentZoom(1)} sx={{ ml: 0.5, textTransform: 'none', fontWeight: 700 }}>
+                รีเซ็ต
+              </Button>
+            </Box>
+          </Menu>
 
           <Button
             variant="contained"
@@ -768,14 +823,29 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
 
         {/* Secure Exam Iframe Shell */}
         {room.examUrl ? (
-          <iframe
-            ref={iframeRef}
-            src={normalizeExamEmbedUrl(room.examUrl)}
-            title="Online Exam Sheet"
-            className="w-full h-full border-0 select-none bg-white"
-            allow="fullscreen; clipboard-read; clipboard-write; microphone; camera"
-            sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-modals"
-          />
+          <div className="absolute inset-0 overflow-auto bg-white">
+            <div
+              style={{
+                width: `${Math.max(1, documentZoom) * 100}%`,
+                height: `${Math.max(1, documentZoom) * 100}%`,
+              }}
+            >
+              <iframe
+                ref={iframeRef}
+                src={normalizeExamEmbedUrl(room.examUrl)}
+                title="Online Exam Sheet"
+                className="block border-0 select-none bg-white"
+                style={{
+                  width: `${100 / Math.max(1, documentZoom)}%`,
+                  height: `${100 / Math.max(1, documentZoom)}%`,
+                  transform: `scale(${documentZoom})`,
+                  transformOrigin: 'top left',
+                }}
+                allow="fullscreen; clipboard-read; clipboard-write; microphone; camera"
+                sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-modals"
+              />
+            </div>
+          </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-slate-500 space-y-3 p-6 text-center">
             <AlertCircle className="w-12 h-12 text-slate-400" />
