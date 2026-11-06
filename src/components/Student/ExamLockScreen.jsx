@@ -79,6 +79,7 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
   const isHandlingViolationRef = useRef(false);
   const departureTimerRef = useRef(null);
   const departureViolationLoggedRef = useRef(false);
+  const splitScreenDetectedRef = useRef(false);
 
   // Lock Escape key using Chrome/Edge Keyboard Lock API if available
   const lockKeyboardKeys = async () => {
@@ -371,17 +372,28 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
     const onResize = () => {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
-        // Mobile browser chrome and iPadOS viewport changes can look like a
-        // resize or split screen even when the student only scrolls the page.
-        if (isTouchDevice || submitted) return;
-        const screenW = window.screen.availWidth || window.screen.width;
+        if (submitted) return;
+
+        // Touch browsers change viewport height as their chrome appears while
+        // scrolling, so use width only on phones/tablets. Side-by-side split
+        // view substantially reduces the available width without reacting to
+        // normal page scrolling or the on-screen keyboard.
+        const screenW = (isTouchDevice ? window.screen.width : window.screen.availWidth) || window.screen.width;
         const screenH = window.screen.availHeight || window.screen.height;
-        if (window.innerWidth < screenW * 0.65 || window.innerHeight < screenH * 0.65) {
+        const isSplitScreen = isTouchDevice
+          ? window.innerWidth < screenW * 0.8
+          : window.innerWidth < screenW * 0.65 || window.innerHeight < screenH * 0.65;
+
+        if (isSplitScreen && !splitScreenDetectedRef.current) {
+          splitScreenDetectedRef.current = true;
           handleViolationTrigger('SPLIT_SCREEN', 'ตรวจพบการย่อหรือแบ่งหน้าจอ (Split Screen)');
+        } else if (!isSplitScreen) {
+          splitScreenDetectedRef.current = false;
         }
       }, 500);
     };
     window.addEventListener('resize', onResize);
+    onResize();
 
     // 7. Prevent Unload / Back navigation
     const onBeforeUnload = (e) => {
@@ -421,6 +433,7 @@ export default function ExamLockScreen({ room = {}, student = {}, onExitExam }) 
       window.removeEventListener('contextmenu', onContextMenu);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('resize', onResize);
+      clearTimeout(resizeTimer);
       window.removeEventListener('beforeunload', onBeforeUnload);
       window.removeEventListener('popstate', onPopState);
       document.removeEventListener('copy', onCopy);
